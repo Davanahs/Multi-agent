@@ -1,0 +1,46 @@
+name: Receive AI Code
+
+on:
+  repository_dispatch:
+    types: [project_generated]
+
+permissions:
+  contents: write
+
+jobs:
+  extract_and_commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Decode and Unzip AI Output into Webhook Folder
+        run: |
+          # 1. Create the webhook folder if it doesn't exist
+          mkdir -p webhook
+          
+          # 2. Extract the base64 ZIP string from the webhook payload sent by Python
+          echo "${{ github.event.client_payload.project_zip_base64 }}" > payload.b64
+          
+          # 3. Decode the base64 string back into a real project.zip file
+          base64 -d payload.b64 > project.zip
+          
+          # 4. Unzip the code directly into the 'webhook' folder so it doesn't overwrite your main code!
+          unzip -o project.zip -d webhook/
+          
+          # 5. Clean up the zip files
+          rm payload.b64 project.zip
+
+      - name: Commit and Push AI Code
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action AI Webhook"
+          git add webhook/
+          
+          # Check if there are any changes to commit
+          if git diff --staged --quiet; then
+            echo "No new AI changes to commit."
+          else
+            git commit -m "🤖 AI Webhook: Automatically generated project code"
+            git push
+          fi
