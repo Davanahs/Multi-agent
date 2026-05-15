@@ -261,4 +261,9 @@ async def execute_workflow(workflow_id: str, sse_emitter=None):
         await sse_emitter("workflow.completed", {"workflowId": workflow_id})
 
     log.workflow_done(workflow_id)
+    
+    # Fire off webhooks in the background so we don't block the API response
+    from .webhooks import dispatch_webhooks
+    asyncio.create_task(dispatch_webhooks(workflow_id, merged, outputs))
+    
     return merged

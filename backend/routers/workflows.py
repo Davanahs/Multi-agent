@@ -234,3 +234,22 @@ async def stream_events(workflow_id: str):
             "X-Accel-Buffering": "no",
         },
     )
+
+# ─── POST /api/workflows/{id}/webhooks ───────────────────────────────────────
+class WebhookCreate(BaseModel):
+    event_type: str = "workflow.completed"
+    webhook_url: str
+    payload: dict = {}
+
+@router.post("/{workflow_id}/webhooks")
+async def register_webhook(workflow_id: str, body: WebhookCreate):
+    wf = await db.fetchrow("SELECT workflow_id FROM workflows WHERE workflow_id=$1::uuid", workflow_id)
+    if not wf:
+        raise HTTPException(404, "Workflow not found")
+        
+    await db.execute(
+        "INSERT INTO webhooks (workflow_id, event_type, webhook_url, status, payload) "
+        "VALUES ($1::uuid, $2, $3, 'active', $4::jsonb)",
+        workflow_id, body.event_type, body.webhook_url, json.dumps(body.payload)
+    )
+    return {"success": True, "message": "Webhook registered successfully"}
