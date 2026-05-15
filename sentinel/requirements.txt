@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+anthropic
+langgraph
+PyGithub
+tavily-python
+e2b-code-interpreter
+celery
+redis
+slack-sdk
+python-dotenv
+requests
+pyngrok
