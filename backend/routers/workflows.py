@@ -57,7 +57,9 @@ async def create_workflow(body: WorkflowCreate):
         try:
             await planner.run_planner(workflow_id, body.prompt)
             # Automatically start execution without waiting for user intervention
-            await executor.execute_workflow(workflow_id)
+            async def _emitter(event_type, payload):
+                await _emit(workflow_id, event_type, payload)
+            await executor.execute_workflow(workflow_id, _emitter)
         except Exception as e:
             import traceback
             traceback.print_exc()
