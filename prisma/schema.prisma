@@ -1,0 +1,176 @@
+// ──────────────────────────────────────────────────────────────────────────
+// Prisma Schema — Multi-Agent System
+//
+// Tables are created/synced dynamically using:
+//   npx prisma db push        → sync schema to database (no migrations needed)
+//   npx prisma generate       → regenerate the Prisma client
+// ──────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Workflows ────────────────────────────────────────────────────────────
+model Workflow {
+  workflow_id String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  prompt      String
+  status      String    @default("queued") // queued | running | done | failed
+  result      Json?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  subtasks    Subtask[]
+  memory      Memory[]
+  logs        Log[]
+  sse_events  SseEvent[]
+  webhooks    Webhook[]
+
+  @@index([status])
+  @@index([created_at(sort: Desc)])
+  @@map("workflows")
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────
+model Model {
+  model_id   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  model_name String
+  provider   String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  agent_outputs AgentOutput[]
+
+  @@unique([model_name, provider], name: "unique_model_provider")
+  @@index([provider])
+  @@map("models")
+}
+
+// ─── Subtasks ─────────────────────────────────────────────────────────────
+model Subtask {
+  subtask_id     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workflow_id    String    @db.Uuid
+  task_id        String    @db.VarChar(10)
+  type           String    @db.VarChar(20)
+  task           String
+  parallel       Boolean   @default(false)
+  status         String    @default("pending") // pending | running | done | failed
+  assigned_agent String?   @db.VarChar(50)
+  priority       String?   @default("medium") // low | medium | high
+  created_at     DateTime  @default(now())
+  completed_at   DateTime?
+
+  workflow      Workflow      @relation(fields: [workflow_id], references: [workflow_id], onDelete: Cascade)
+  deps          SubtaskDep[]  @relation("SubtaskDeps")
+  agent_outputs AgentOutput[]
+
+  @@index([workflow_id])
+  @@index([status])
+  @@index([assigned_agent])
+  @@map("subtasks")
+}
+
+// ─── Subtask Dependencies ─────────────────────────────────────────────────
+model SubtaskDep {
+  id                 String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subtask_id         String @db.Uuid
+  depends_on_task_id String @db.VarChar(10)
+
+  subtask Subtask @relation("SubtaskDeps", fields: [subtask_id], references: [subtask_id], onDelete: Cascade)
+
+  @@index([subtask_id])
+  @@map("subtask_deps")
+}
+
+// ─── Agent Outputs ────────────────────────────────────────────────────────
+model AgentOutput {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subtask_id        String   @db.Uuid
+  model_id          String?  @db.Uuid
+  agent             String   @db.VarChar(50)
+  status            String   @default("done") @db.VarChar(20)
+  input_context     String?
+  output            String?
+  consumed_from     Json     @default("[]")
+  input_tokens      Int      @default(0)
+  output_tokens     Int      @default(0)
+  execution_time_ms Int      @default(0)
+  retry_count       Int      @default(0)
+  created_at        DateTime @default(now())
+
+  subtask Subtask @relation(fields: [subtask_id], references: [subtask_id], onDelete: Cascade)
+  model   Model?  @relation(fields: [model_id], references: [model_id], onDelete: SetNull)
+
+  @@index([subtask_id])
+  @@index([agent])
+  @@index([model_id])
+  @@map("agent_outputs")
+}
+
+// ─── Memory ───────────────────────────────────────────────────────────────
+model Memory {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workflow_id  String   @db.Uuid
+  memory_key   String
+  memory_value String
+  created_at   DateTime @default(now())
+
+  workflow Workflow @relation(fields: [workflow_id], references: [workflow_id], onDelete: Cascade)
+
+  @@index([workflow_id])
+  @@index([memory_key])
+  @@map("memory")
+}
+
+// ─── Logs ─────────────────────────────────────────────────────────────────
+model Log {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workflow_id String   @db.Uuid
+  source      String   @db.VarChar(100)
+  log_level   String   @db.VarChar(20)
+  message     String
+  created_at  DateTime @default(now())
+
+  workflow Workflow @relation(fields: [workflow_id], references: [workflow_id], onDelete: Cascade)
+
+  @@index([workflow_id])
+  @@index([log_level])
+  @@index([created_at(sort: Desc)])
+  @@map("logs")
+}
+
+// ─── SSE Events ───────────────────────────────────────────────────────────
+model SseEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workflow_id String   @db.Uuid
+  event_type  String   @db.VarChar(40)
+  payload     Json     @default("{}")
+  emitted_at  DateTime @default(now())
+
+  workflow Workflow @relation(fields: [workflow_id], references: [workflow_id], onDelete: Cascade)
+
+  @@index([workflow_id])
+  @@index([event_type])
+  @@map("sse_events")
+}
+
+// ─── Webhooks ─────────────────────────────────────────────────────────────
+model Webhook {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workflow_id String   @db.Uuid
+  event_type  String   @db.VarChar(100)
+  webhook_url String
+  status      String   @default("active") @db.VarChar(20)
+  payload     Json     @default("{}")
+  created_at  DateTime @default(now())
+
+  workflow Workflow @relation(fields: [workflow_id], references: [workflow_id], onDelete: Cascade)
+
+  @@index([workflow_id])
+  @@index([event_type])
+  @@map("webhooks")
+}
