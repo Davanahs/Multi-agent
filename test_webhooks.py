@@ -3,9 +3,13 @@ import json
 import uuid
 from backend import db
 from backend.services_py.webhooks import dispatch_webhooks
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 DISCORD_URL = "https://discord.com/api/webhooks/1504935126692266064/rtghnA-EmspUAKugMCwfvSy8m41Idn70Env6T5e5eRFytL8WxbLQrYJmbt3ZT1Am7HLz"
-GITHUB_TOKEN = "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"
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 GITHUB_URL = "https://api.github.com/repos/Davanahs/Multi-agent/dispatches"
 
 async def main():
