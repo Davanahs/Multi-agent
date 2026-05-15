@@ -1,0 +1,1 @@
+print('Task 1 completed successfully.')
