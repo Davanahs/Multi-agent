@@ -1,46 +1,69 @@
-# Palindrome Detection in Python
-## Introduction
+**Palindrome Checking System**
+=============================
 
-A **palindrome** is a sequence of characters that reads the same forward and backward, applicable to single words, phrases, numbers, and sentences ignoring spaces and punctuation. Palindromes have various use cases, including string validation, anagram detection, and bioinformatics.
+**Introduction**
+---------------
 
-## Key Findings and Use Cases
+A palindrome is a sequence of characters that reads the same backward as forward. This document outlines the design, implementation, and testing of a palindrome checking system using Python.
 
-Palindromes can be found in different forms, such as:
-* Single words (e.g., "racecar", "level")
-* Phrases (e.g., "A man, a plan, a canal: Panama")
-* Numbers (e.g., 12321)
-* Sentences ignoring spaces and punctuation
+**Existing Implementation Options**
+----------------------------------
 
-Common applications of palindrome detection include:
-* String validation
-* Anagram detection
-* Bioinformatics
+There are various existing implementation options for palindromes, including:
 
-## Solution Overview
+* Symmetry-based approaches: This approach checks if a string is a palindrome by comparing its characters from the start and end positions, moving towards the center.
+* Reversibility-based approaches: This approach checks if a string is a palindrome by reversing the string and comparing it with the original string.
 
-To determine whether a given string is a palindrome, we provide a well-documented Python function `is_palindrome`. This function ignores case and non-alphanumeric characters, using the two-pointer technique:
-* Normalize the input by converting it to lowercase
-* Compare characters from the start and end of the string, moving towards the center
+**Palindrome Checker Implementation**
+-------------------------------------
 
-## Implementation Details
+Our implementation provides a Python class `PalindromeChecker` with a method `is_palindrome` to check whether a given string is a palindrome. The class uses dynamic programming to find the longest palindromic substring and then checks if the entire string is a palindrome.
 
-The `is_palindrome` function takes a string as input and returns a boolean value indicating whether the string is a palindrome. The function is designed to handle various edge cases, including empty strings, single-character strings, and strings containing punctuation and special characters.
+**Palindrome Checker Implementation Details**
+---------------------------------------------
 
-## Testing and Validation
+The `PalindromeChecker` class has the following properties:
 
-A comprehensive test suite has been developed to validate the `is_palindrome` function. The test suite includes:
-* **Unit tests**: Verifying the core behavior of the function
-* **Edge-case tests**: Testing the function with empty strings, only punctuation, single-character strings, Unicode, and very long inputs
+* `is_palindrome` method: This method takes a string as input and returns `True` if the string is a palindrome, and `False` otherwise.
+* Dynamic programming approach: This approach uses a 2D table to store whether each substring is a palindrome or not.
 
-The test suite is written using `pytest` but can be easily adapted to use `unittest`.
+**Test Requirements and Implementation**
+-----------------------------------------
 
-## Code and Example Use Cases
+We have implemented comprehensive unit tests for the `is_palindrome` method using Pytest and Unittest. The tests cover various scenarios, including:
 
-While the specific code implementation is not provided here, the `is_palindrome` function can be used in various scenarios, such as:
-* Validating user input
-* Detecting palindromes in text data
-* Solving puzzles and games related to palindromes
+* Correctness: The tests ensure that the method returns the correct result for various palindromic and non-palindromic strings.
+* Edge cases: The tests cover empty strings, single-character strings, and strings with non-alphanumeric characters.
+* Integration scenarios: The tests check palindromes with different lengths and types of characters.
 
-## Executive Summary
+**Technology Stack**
+-------------------
 
-This document provides an overview of palindrome detection in Python, including the definition, use cases, solution overview, implementation details, and testing. The `is_palindrome` function is a well-documented and thoroughly tested solution for determining whether a given string is a palindrome, ignoring case and non-alphanumeric characters. With its comprehensive test suite and robust implementation, this function can be applied to various real-world scenarios.
+Our implementation utilizes the following technology stack:
+
+* Python 3.9+
+* Pytest 7.1.2+
+* Unittest 3.10+
+
+**Refactored Palindrome Checker Implementation**
+-----------------------------------------------
+
+The refactored implementation provides a user-friendly `PalindromeChecker` class with a method `is_palindrome` to check whether a given string is a palindrome. The class uses dynamic programming to find the longest palindromic substring and then checks if the entire string is a palindrome.
+
+**Refactored Implementation Details**
+--------------------------------------
+
+The refactored `PalindromeChecker` class has the following properties:
+
+* `is_palindrome` method: This method takes a string as input and returns `True` if the string is a palindrome, and `False` otherwise.
+* Dynamic programming approach: This approach uses a 2D table to store whether each substring is a palindrome or not.
+
+**Conclusion**
+----------
+
+This document outlines the design, implementation, and testing of a palindrome checking system using Python. The system provides a user-friendly API to check whether a given string is a palindrome, and covers various test scenarios to ensure correctness and robustness.
+
+**Executive Summary**
+-------------------
+
+The palindrome checking system is a robust implementation that uses dynamic programming to find the longest palindromic substring and then checks if the entire string is a palindrome. The system supports various test scenarios, including correctness, edge cases, and integration scenarios. The refactored implementation provides a user-friendly API to check whether a given string is a palindrome. The system utilizes the following technology stack: Python 3.9+, Pytest 7.1.2+, and Unittest 3.10+.
