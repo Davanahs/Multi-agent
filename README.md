@@ -342,6 +342,56 @@ Every meaningful step is traced and causally linked:
 - Webhook ingress and async dispatch
 
 Traces preserve the full causal chain — each sub-agent step links back to its parent wave, which links back to the root workflow trigger. The Omium dashboard shows the same workflow that ran in the demo, with the same steps, in the same order, fully inspectable.
+## Live Omium Dashboard
+
+This project is fully instrumented using the Omium AI SDK for distributed tracing and workflow observability.
+
+### Verified Workflow Trace
+
+**Dashboard URL:**
+https://app.omium.ai/ai-systems
+
+The dashboard contains a complete end-to-end execution trace of the demo workflow shown in the submission video.
+
+### Traced Events
+
+The following events are fully instrumented and causally linked:
+
+* Workflow trigger initialization
+* Planner agent DAG generation
+* Wave scheduling and execution
+* Parallel task fan-out
+* Sub-agent execution lifecycle
+* Tool calls and provider selection
+* LLM fallback and retry events
+* Result merger synthesis
+* Webhook ingress handling
+* Workflow completion states
+
+### Causal Linking
+
+All spans preserve parent-child relationships across the workflow lifecycle:
+
+Workflow
+→ Waves
+→ Tasks
+→ Tool Calls
+→ Provider Requests
+→ Result Aggregation
+
+This enables judges to inspect the exact execution path followed during the live demo.
+
+### Demo Verification
+
+The Omium trace matches the workflow execution shown in the demo video:
+
+* Same workflow ID
+* Same execution order
+* Same task graph
+* Same provider routing
+* Same completion timeline
+
+The dashboard acts as a verifiable audit trail for autonomous execution.
 
 ---
 
