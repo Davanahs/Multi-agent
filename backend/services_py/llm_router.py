@@ -145,6 +145,15 @@ async def call_model(provider: str, model_name: str, messages: list[dict],
 
 
 # ─── Main entry: route with cascading fallback ────────────────────────────────
+try:
+    import omium
+    _trace = omium.trace
+except ImportError:
+    def _trace(name=None):
+        def decorator(func): return func
+        return decorator
+
+@_trace("llm_routing")
 async def route_prompt(messages: list[dict], task_type: str = "general",
                        max_tokens: int = 4096,
                        exclude_models: list[str] | None = None) -> dict:

@@ -86,7 +86,16 @@ def build_waves(tasks: list[dict]) -> list[list[dict]]:
     return waves
 
 
+try:
+    import omium
+    _trace = omium.trace
+except ImportError:
+    def _trace(name=None):
+        def decorator(func): return func
+        return decorator
+
 # ─── Execute a single subtask ─────────────────────────────────────────────────
+@_trace("agent_task")
 async def _run_single_task(task: dict, dep_context: str,
                            sse_emitter=None) -> dict:
     task_id   = task["task_id"]
@@ -179,7 +188,15 @@ async def _run_single_task(task: dict, dep_context: str,
 
 
 # ─── Execute full workflow (all waves) ────────────────────────────────────────
+@_trace("workflow_execution")
 async def execute_workflow(workflow_id: str, sse_emitter=None):
+    try:
+        import omium
+        if hasattr(omium, "set_execution_id"):
+            omium.set_execution_id(workflow_id)
+    except Exception:
+        pass
+
     log.workflow_start(workflow_id, "")
 
     # Load all subtasks + deps

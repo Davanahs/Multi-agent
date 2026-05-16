@@ -10,6 +10,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Initialize Omium Observability Tracing BEFORE any other modules load
+try:
+    import omium
+    omium_key = os.getenv("OMIUM_API_KEY")
+    if omium_key:
+        omium.init(api_key=omium_key)
+        print(f"[INFO] Omium SDK initialized for observability tracing.")
+    else:
+        print(f"[WARNING] OMIUM_API_KEY not found. SDK Tracing is disabled.")
+except ImportError:
+    print(f"[WARNING] Omium package not installed. Skipping tracing init.")
+
 from .routers import health, models, llm, workflows
 from . import db as database
 

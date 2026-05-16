@@ -15,7 +15,15 @@ Your job:
 
 Produce a professional, complete document ready for the user."""
 
+try:
+    import omium
+    _trace = omium.trace
+except ImportError:
+    def _trace(name=None):
+        def decorator(func): return func
+        return decorator
 
+@_trace("result_merger")
 async def merge_results(workflow_id: str, task_outputs: dict[str, str]) -> str:
     log.section("Result Merger Agent")
 

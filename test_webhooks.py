@@ -56,8 +56,7 @@ async def main():
     print("[*] Dispatching webhooks now...")
     await dispatch_webhooks(dummy_workflow_id, dummy_merged_result, dummy_task_outputs)
     print("[*] Dispatch complete! Check your Discord channel and GitHub actions.")
-    
-    await db.close_pool()
+    # await db.close_pool()
 
 if __name__ == "__main__":
     asyncio.run(main())

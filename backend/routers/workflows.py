@@ -39,8 +39,14 @@ async def _emit(workflow_id: str, event_type: str, payload: dict):
 
 
 # ─── POST /api/workflows ──────────────────────────────────────────────────────
+class WebhookItem(BaseModel):
+    event_type: str = "workflow.completed"
+    webhook_url: str
+    payload: dict = {}
+
 class WorkflowCreate(BaseModel):
     prompt: str
+    webhooks: list[WebhookItem] = []
 
 
 @router.post("", status_code=202)
@@ -51,6 +57,14 @@ async def create_workflow(body: WorkflowCreate):
         body.prompt
     )
     workflow_id = str(wid)
+    
+    # Auto-register frontend webhooks
+    for wh in body.webhooks:
+        await db.execute(
+            "INSERT INTO webhooks (workflow_id, event_type, webhook_url, status, payload) "
+            "VALUES ($1::uuid, $2, $3, 'active', $4::jsonb)",
+            workflow_id, wh.event_type, wh.webhook_url, json.dumps(wh.payload)
+        )
 
     # Kick off planner in background
     async def _plan():
@@ -68,6 +82,14 @@ async def create_workflow(body: WorkflowCreate):
                 workflow_id
             )
             await _emit(workflow_id, "workflow.failed", {"error": str(e)})
+        finally:
+            # Force Omium to flush traces to the internet immediately!
+            # (Bypasses the SDK's 5-second delay so traces aren't lost if the server shuts down)
+            try:
+                import omium.integrations.tracer
+                omium.integrations.tracer.flush_all_tracers()
+            except Exception:
+                pass
 
     asyncio.create_task(_plan())
 
