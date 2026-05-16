@@ -1,120 +1,65 @@
-**Palindrome Checker Implementation**
-=====================================
+**Palindrome Checking Function in Python**
+===============================================
 
-**Introduction**
----------------
-
-This implementation provides a Python class `PalindromeChecker` with a method `is_palindrome` to check whether a given string is a palindrome. The class uses dynamic programming to find the longest palindromic substring and then checks if the entire string is a palindrome.
-
-**Technology Stack**
--------------------
-
-* Python 3.9+
-* Pytest 7.1.2+
-* unittest 3.10+
-
-**Implementation**
------------------
+### Implementation
 
 ```python
-# palindrome_checker.py
-class PalindromeChecker:
-    def is_palindrome(self, s: str) -> bool:
-        """
-        Checks whether a given string is a palindrome.
+def is_palindrome(character_sequence: str) -> bool:
+    """
+    Checks if a given character sequence is a palindrome.
 
-        Args:
-            s (str): The input string to check.
+    Args:
+    character_sequence (str): The input character sequence.
 
-        Returns:
-            bool: True if the string is a palindrome, False otherwise.
-        """
-        # Remove non-alphanumeric characters and convert to lowercase
-        s = ''.join(e for e in s if e.isalnum()).lower()
-        
-        # Initialize a 2D table to store the longest palindromic substring lengths
-        n = len(s)
-        dp = [[False] * n for _ in range(n)]
-        
-        # All substrings of length 1 are palindromes
-        for i in range(n):
-            dp[i][i] = True
-        
-        # Check for substrings of length 2
-        for i in range(n - 1):
-            if s[i] == s[i + 1]:
-                dp[i][i + 1] = True
-        
-        # Check for lengths greater than 2
-        for length in range(3, n + 1):
-            for i in range(n - length + 1):
-                j = i + length - 1
-                
-                # If the first and last characters are the same, check the substring in between
-                if s[i] == s[j] and dp[i + 1][j - 1]:
-                    dp[i][j] = True
-        
-        # Check if the entire string is a palindrome
-        return dp[0][n - 1]
+    Returns:
+    bool: True if the character sequence is a palindrome, False otherwise.
+    """
+
+    # Remove white spaces and convert the sequence to lowercase to ignore case sensitivity and extra spaces
+    cleaned_sequence = ''.join(e for e in character_sequence if e.isalnum()).lower()
+
+    # Compare the cleaned sequence with its reverse
+    return cleaned_sequence == cleaned_sequence[::-1]
 ```
 
-**Unit Tests**
--------------
+### Explanation
 
-We will write unit tests for the `PalindromeChecker` class using Pytest.
+This function, `is_palindrome`, uses a two-step approach to check if a given character sequence is a palindrome:
+
+1.  **Cleaning the Input Sequence**: It cleans the input sequence by removing white spaces and converting it to lowercase. This ensures that:
+    *   Extra spaces are ignored.
+    *   Case sensitivity is ignored (e.g., "Madam" and "madam" are considered the same).
+    *   The function is able to check sequences with alphanumeric characters and special characters.
+
+2.  **Checking for Palindrome**: After cleaning the input sequence, it is compared with its reverse (`cleaned_sequence[::-1]`). If the cleaned sequence is equal to its reverse, it is a palindrome, and the function returns `True`. Otherwise, the function returns `False`.
+
+### Example Use Cases
 
 ```python
-# test_palindrome_checker.py
-import pytest
-from palindrome_checker import PalindromeChecker
+# Test with a single character
+print(is_palindrome("7"))  # Expected Output: True
 
-def test_palindrome_checker():
-    checker = PalindromeChecker()
-    
-    # Test word palindromes
-    assert checker.is_palindrome("madam")
-    assert checker.is_palindrome("level")
-    
-    # Test phrase palindromes
-    assert checker.is_palindrome("a man, a plan, a canal, Panama!")
-    
-    # Test number palindromes
-    assert checker.is_palindrome("12321")
-    
-    # Test non-palindromes
-    assert not checker.is_palindrome("hello")
-    assert not checker.is_palindrome("world")
+# Test with a word
+print(is_palindrome("madam"))  # Expected Output: True
+
+# Test with a phrase
+print(is_palindrome("A man, a plan, a canal, Panama!"))  # Expected Output: True
+
+# Test with a number
+print(is_palindrome("12321"))  # Expected Output: True
+
+# Test with a non-palindrome sequence
+print(is_palindrome("hello"))  # Expected Output: False
 ```
 
-**Setup Instructions**
------------------------
+### Setup Instructions (Optional)
 
-1. Install the required libraries by running `pip install pytest` in your terminal.
-2. Create a new file called `palindrome_checker.py` and paste the implementation code into it.
-3. Create a new file called `test_palindrome_checker.py` and paste the unit test code into it.
-4. Run the unit tests by executing `pytest` in your terminal.
-5. Verify that all tests pass and the implementation is correct.
+To run the above code:
 
-**Commit Message**
------------------
+1.  Ensure you have Python installed on your system.
+2.  Open a Python IDE (Integrated Development Environment) like PyCharm, Visual Studio Code, or IDLE.
+3.  Copy and paste the code into the IDE.
+4.  Press the Run button or press Shift+F10 to execute the code.
+5.  Observe the output in the console or output window.
 
-`Added palindrome checker implementation with unit tests`
-
-**API Documentation**
----------------------
-
-```markdown
-# PalindromeChecker
-
-## is_palindrome
-
-Checks whether a given string is a palindrome.
-
-### Args
-
-* `s (str)`: The input string to check.
-
-### Returns
-
-* `bool`: True if the string is a palindrome, False otherwise.
-```
+Remember, this function is case-insensitive and ignores white spaces and extra characters, making it a robust and general-purpose palindrome-checking solution.

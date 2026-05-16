@@ -1,115 +1,43 @@
-**Palindrome Checking Unit Tests**
-=====================================
+**Palindrome Checking Function: Inputs and Outputs**
 
 **Introduction**
----------------
 
-This project contains unit tests for palindrome checking. The implementation is based on the properties of palindromes, including symmetry and reversibility.
+This section elaborates on the inputs and outputs of the palindrome-checking function, providing a clear understanding of the parameters and results associated with this operation.
 
-**Technology Stack**
--------------------
+**Function Overview**
 
-* Python 3.9+
-* Pytest 7.1.2+
-* unittest 3.10+
+The palindrome-checking function is a computer algorithm designed to verify whether a given sequence of characters is a palindrome or not. This function takes a character sequence as input and returns a boolean value indicating whether the sequence is a palindrome or not.
 
-**Implementation**
------------------
+**Inputs**
 
-We will implement a simple palindrome checker using a Python class. The class will have a method `is_palindrome` that checks whether a given string is a palindrome.
+The palindrome-checking function expects the following input:
 
-```python
-# palindrome_checker.py
-class PalindromeChecker:
-    def is_palindrome(self, s: str) -> bool:
-        """
-        Checks whether a given string is a palindrome.
+- **Character Sequence (string)**: The sequence of characters to be checked for palindrome. This can be a single character, a word, a phrase, a number, or any other sequence of characters. The character sequence can be composed of:
+    - **Alphanumeric characters** (letters, digits, and underscore): "a", "A", "1", "7", "_", etc.
+    - **Special characters** (symbols and punctuation): "!", "@", "#", "$", etc.
+    - **Spaces** and **punctuation marks**: " ", ".", ",", etc.
 
-        Args:
-            s (str): The input string to check.
+    **Sample Input Examples**
+    - Single character: "7"
+    - Word: "madam"
+    - Phrase: "A man, a plan, a canal, Panama!"
+    - Number: "12321"
 
-        Returns:
-            bool: True if the string is a palindrome, False otherwise.
-        """
-        # Remove non-alphanumeric characters and convert to lowercase
-        s = ''.join(e for e in s if e.isalnum()).lower()
-        
-        # Compare the string with its reverse
-        return s == s[::-1]
-```
+**Outputs**
 
-**Unit Tests**
--------------
+The palindrome-checking function returns the following output:
 
-We will write unit tests for the `PalindromeChecker` class using Pytest.
+- **Boolean Value (true or false)**: A boolean value indicating whether the input character sequence is a palindrome or not.
 
-```python
-# test_palindrome_checker.py
-import pytest
-from palindrome_checker import PalindromeChecker
+    **Sample Output Examples**
+    - Input: "madam" - Output: true
+    - Input: "hello" - Output: false
+    - Input: "12321" - Output: true
+    - Input: "7" - Output: true (single-character palindrome)
 
-def test_palindrome_checker():
-    checker = PalindromeChecker()
-    
-    # Test word palindromes
-    assert checker.is_palindrome("madam")
-    assert checker.is_palindrome("level")
-    
-    # Test phrase palindromes
-    assert checker.is_palindrome("a man, a plan, a canal, Panama!")
-    
-    # Test number palindromes
-    assert checker.is_palindrome("12321")
-    
-    # Test non-palindromes
-    assert not checker.is_palindrome("hello")
-    assert not checker.is_palindrome("world")
-    
-    # Test edge cases
-    assert checker.is_palindrome("")
-    assert checker.is_palindrome("a")
+**Notes on Handling Cases**
 
-def test_palindrome_checker_empty_string():
-    checker = PalindromeChecker()
-    assert checker.is_palindrome("")
-
-def test_palindrome_checker_single_character():
-    checker = PalindromeChecker()
-    assert checker.is_palindrome("a")
-
-def test_palindrome_checker_non_alphanumeric_characters():
-    checker = PalindromeChecker()
-    assert checker.is_palindrome("A man, a plan, a canal, Panama!")
-```
-
-**Setup Instructions**
-----------------------
-
-1. Install the required packages by running `pip install pytest`
-2. Create a new file `palindrome_checker.py` and add the `PalindromeChecker` class implementation
-3. Create a new file `test_palindrome_checker.py` and add the unit tests
-4. Run the tests using `pytest`
-
-**Commit Message**
------------------
-
-`Added palindrome checker implementation and unit tests`
-
-**API Documentation**
----------------------
-
-### PalindromeChecker
-
-#### is_palindrome
-
-Checks whether a given string is a palindrome.
-
-* **Arguments**: `s (str)`: The input string to check.
-* **Returns**: `bool`: True if the string is a palindrome, False otherwise.
-
-### Test Cases
-
-* `test_palindrome_checker`: Tests the `is_palindrome` method with various inputs.
-* `test_palindrome_checker_empty_string`: Tests the `is_palindrome` method with an empty string.
-* `test_palindrome_checker_single_character`: Tests the `is_palindrome` method with a single character.
-* `test_palindrome_checker_non_alphanumeric_characters`: Tests the `is_palindrome` method with non-alphanumeric characters.
+- **Empty string**: If the input character sequence is an empty string, the function should return false, as an empty string is not a palindrome.
+- **Multiple blanks or whitespace**: If the input character sequence contains multiple blanks or whitespace, the function should treat them as a single character (space).
+- **Case sensitivity**: The function may consider the case sensitivity of the input character sequence, meaning that uppercase and lowercase letters are treated as different characters. To make the function case-insensitive, the input character sequence can be converted to lowercase or uppercase before checking for palindromes.
+- **Special characters and punctuation**: The function may treat special characters and punctuation marks as part of the character sequence. To handle them as separators, the input character sequence can be cleaned and removed any special characters and punctuation marks before checking for palindromes.
