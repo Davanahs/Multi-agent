@@ -12,18 +12,21 @@ from .. import db
 load_dotenv()
 
 # ─── Priority order per task type ─────────────────────────────────────────────
+# Priority order is sorted so providers WITH configured API keys come first.
+# Groq is moved up because it's fast, free-tier friendly, and has a valid key.
+# Google/OpenAI/Anthropic are kept in list but will be skipped if no key.
 TASK_PRIORITY: dict[str, list[str]] = {
-    "planning":  ["google", "openai", "anthropic", "openrouter", "groq", "nvidia"],
-    "reasoning": ["google", "openai", "anthropic", "openrouter", "groq", "nvidia"],
-    "coding":    ["openai", "anthropic", "google", "openrouter", "groq", "nvidia"],
-    "ui":        ["openai", "anthropic", "google", "openrouter", "groq", "nvidia"],
-    "research":  ["google", "openai", "anthropic", "openrouter", "groq", "nvidia"],
-    "fast":      ["groq", "google", "nvidia", "openrouter", "openai", "anthropic"],
-    "general":   ["google", "openai", "anthropic", "groq", "nvidia", "openrouter"],
-    "testing":   ["openai", "anthropic", "google", "openrouter", "groq", "nvidia"],
-    "deployment":["openai", "anthropic", "google", "openrouter", "groq", "nvidia"],
-    "writing":   ["google", "openai", "anthropic", "groq", "nvidia", "openrouter"],
-    "analysis":  ["google", "openai", "anthropic", "openrouter", "groq", "nvidia"],
+    "planning":  ["groq", "nvidia", "google", "openai", "anthropic", "openrouter"],
+    "reasoning": ["groq", "nvidia", "google", "openai", "anthropic", "openrouter"],
+    "coding":    ["groq", "nvidia", "openai", "anthropic", "google", "openrouter"],
+    "ui":        ["groq", "nvidia", "openai", "anthropic", "google", "openrouter"],
+    "research":  ["groq", "nvidia", "google", "openai", "anthropic", "openrouter"],
+    "fast":      ["groq", "nvidia", "google", "openrouter", "openai", "anthropic"],
+    "general":   ["groq", "nvidia", "google", "openai", "anthropic", "openrouter"],
+    "testing":   ["groq", "nvidia", "openai", "anthropic", "google", "openrouter"],
+    "deployment":["groq", "nvidia", "openai", "anthropic", "google", "openrouter"],
+    "writing":   ["groq", "nvidia", "google", "openai", "anthropic", "openrouter"],
+    "analysis":  ["groq", "nvidia", "google", "openai", "anthropic", "openrouter"],
 }
 
 # ─── Preferred models within each provider ────────────────────────────────────
@@ -31,8 +34,10 @@ PREFERRED_MODELS: dict[str, list[str]] = {
     "google":     ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
     "openai":     ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
     "anthropic":  ["claude-opus-4-5", "claude-sonnet-4-5", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"],
-    "groq":       ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
-    "nvidia":     ["meta/llama-3.1-70b-instruct", "nvidia/llama-3.1-nemotron-70b-instruct"],
+    "groq":       ["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "llama-3.1-70b-versatile", 
+                   "meta-llama/llama-4-scout-17b-16e-instruct", "mixtral-8x7b-32768"],
+    "nvidia":     ["meta/llama-3.1-8b-instruct", "nvidia/llama-3.1-nemotron-70b-instruct",
+                   "meta/llama-3.1-70b-instruct"],
     "openrouter": ["openai/gpt-4o", "anthropic/claude-3.5-sonnet", "google/gemini-pro-1.5"],
 }
 
@@ -166,8 +171,15 @@ async def route_prompt(messages: list[dict], task_type: str = "general",
     attempts = []
 
     for provider in provider_order:
+        # Skip immediately if no API key is configured for this provider
+        api_key = API_KEYS.get(provider, lambda: "")()        
+        if not api_key:
+            log.info(f"  [skip] {provider} — no API key configured")
+            continue
+
         model = await get_best_model_for_provider(provider, exclude_models)
         if not model:
+            log.info(f"  [skip] {provider} — no active models in DB")
             continue
 
         model_name = model["model_name"]

@@ -34,7 +34,7 @@ try:
 except ImportError:
     RED = GREEN = YELLOW = CYAN = BLUE = RESET = BOLD = ""
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:8001"
 results  = {"passed": 0, "failed": 0}
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

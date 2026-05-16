@@ -101,3 +101,9 @@ def error(msg: str):
 
 def section(title: str):
     print(f"\n{Fore.WHITE}--- {title} ---{Style.RESET_ALL}")
+
+def webhook_success(msg: str):
+    print(f"\n{Fore.WHITE}{Back.BLUE} WEBHOOK DISPATCHED {Style.RESET_ALL} {Fore.CYAN}{msg}{Style.RESET_ALL}\n")
+
+def omium_success(msg: str):
+    print(f"\n{Fore.WHITE}{Back.MAGENTA} OMIUM TRACE {Style.RESET_ALL} {Fore.LIGHTMAGENTA_EX}{msg}{Style.RESET_ALL}\n")

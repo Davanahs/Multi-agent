@@ -58,6 +58,20 @@ async def create_workflow(body: WorkflowCreate):
     )
     workflow_id = str(wid)
     
+    # Auto-attach latest webhooks so user doesn't have to specify them every time
+    await db.execute(
+        """
+        INSERT INTO webhooks (workflow_id, event_type, webhook_url, payload, status)
+        SELECT $1::uuid, event_type, webhook_url, payload, status
+        FROM (
+            SELECT DISTINCT ON (webhook_url) event_type, webhook_url, payload, status
+            FROM webhooks
+            ORDER BY webhook_url, created_at DESC
+        ) sub
+        """,
+        workflow_id
+    )
+    
     # Auto-register frontend webhooks
     for wh in body.webhooks:
         await db.execute(
@@ -88,6 +102,8 @@ async def create_workflow(body: WorkflowCreate):
             try:
                 import omium.integrations.tracer
                 omium.integrations.tracer.flush_all_tracers()
+                from backend.services_py import logger
+                logger.omium_success("Successfully synced execution traces to Omium Dashboard")
             except Exception:
                 pass
 

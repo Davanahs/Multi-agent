@@ -24,7 +24,7 @@ async def create_project_zip(merged_result: str, task_outputs: dict) -> bytes:
     return zip_buffer.getvalue()
 
 
-async def dispatch_webhooks(workflow_id: str, merged_result: str, task_outputs: dict):
+async def dispatch_webhooks(workflow_id: str, merged_result: str, task_outputs: dict, sse_emitter=None):
     webhooks = await db.fetch(
         "SELECT webhook_url, payload FROM webhooks "
         "WHERE workflow_id=$1::uuid AND event_type='workflow.completed' AND status='active'",
@@ -34,6 +34,16 @@ async def dispatch_webhooks(workflow_id: str, merged_result: str, task_outputs: 
         return
 
     log.info(f"Dispatching {len(webhooks)} webhooks for workflow {workflow_id}")
+    
+    # Fetch prompt to name the zip file
+    wf_row = await db.fetchrow("SELECT prompt FROM workflows WHERE workflow_id=$1::uuid", workflow_id)
+    prompt = wf_row["prompt"] if wf_row else "project"
+    
+    # Sanitize prompt for filename (alphanumeric and underscores only, max 40 chars)
+    import re
+    safe_name = re.sub(r'[^a-zA-Z0-9]+', '_', prompt.lower()).strip('_')
+    safe_name = safe_name[:40] if safe_name else "project"
+    zip_filename = f"{safe_name}_export.zip"
     
     zip_bytes = await create_project_zip(merged_result, task_outputs)
     
@@ -51,16 +61,18 @@ async def dispatch_webhooks(workflow_id: str, merged_result: str, task_outputs: 
                 if "discord.com/api/webhooks" in url:
                     # Discord Multipart Upload
                     files = {
-                        "file": ("project_export.zip", zip_bytes, "application/zip")
+                        "file": (zip_filename, zip_bytes, "application/zip")
                     }
                     data = {
                         "payload_json": json.dumps({
-                            "content": f"✅ **Workflow Completed!** ID: `{workflow_id}`\nI've attached the complete project in zip format."
+                            "content": f"✅ **Workflow Completed!** ID: `{workflow_id}`\nI've attached `{zip_filename}`."
                         })
                     }
                     r = await client.post(url, data=data, files=files)
                     r.raise_for_status()
-                    log.info(f"Successfully dispatched Discord webhook to {url}")
+                    log.webhook_success(f"Successfully dispatched Discord webhook to {url}")
+                    if sse_emitter:
+                        await sse_emitter("webhook", {"taskId": "webhook", "taskLabel": f"Pushed project to Discord"})
                     
                 elif "api.github.com" in url:
                     # GitHub Repository Dispatch
@@ -87,13 +99,16 @@ async def dispatch_webhooks(workflow_id: str, merged_result: str, task_outputs: 
                         "event_type": event_type,
                         "client_payload": {
                             "workflow_id": workflow_id,
-                            "project_zip_base64": b64_zip
+                            "project_zip_base64": b64_zip,
+                            "zip_filename": zip_filename
                         }
                     }
                     
                     r = await client.post(url, headers=headers, json=dispatch_data)
                     r.raise_for_status()
-                    log.info(f"Successfully dispatched GitHub webhook to {url}")
+                    log.webhook_success(f"Successfully dispatched GitHub webhook to {url}")
+                    if sse_emitter:
+                        await sse_emitter("webhook", {"taskId": "webhook", "taskLabel": f"Pushed code to GitHub"})
                     
                 else:
                     # Generic standard webhook (Base64 encoded zip to avoid huge raw JSON dumps)
@@ -101,14 +116,19 @@ async def dispatch_webhooks(workflow_id: str, merged_result: str, task_outputs: 
                     generic_payload = {
                         "workflow_id": workflow_id,
                         "status": "completed",
-                        "project_zip_base64": b64_zip
+                        "project_zip_base64": b64_zip,
+                        "zip_filename": zip_filename
                     }
                     # merge with any custom user payload
                     generic_payload.update(user_payload)
                     
                     r = await client.post(url, json=generic_payload)
                     r.raise_for_status()
-                    log.info(f"Successfully dispatched generic webhook to {url}")
+                    log.webhook_success(f"Successfully dispatched generic webhook to {url}")
+                    if sse_emitter:
+                        await sse_emitter("webhook", {"taskId": "webhook", "taskLabel": f"Pushed webhook to {url[:30]}..."})
                     
             except Exception as e:
                 log.error(f"Failed to dispatch webhook to {url}: {e}")
+                if sse_emitter:
+                    await sse_emitter("task.failed", {"taskId": "webhook", "taskLabel": f"Webhook failed: {str(e)[:50]}"})

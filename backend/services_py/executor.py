@@ -119,37 +119,43 @@ async def _run_single_task(task: dict, dep_context: str,
         task["subtask_id"]
     )
 
-    excluded = []
+    excluded: list[str] = []
+    last_result: dict | None = None
+
     for attempt in range(MAX_RETRIES + 1):
         try:
             t0 = time.monotonic()
-            result = await llm_router.route_prompt(
+            last_result = await llm_router.route_prompt(
                 messages, task_type=llm_type, max_tokens=3000,
                 exclude_models=excluded
             )
             ms = int((time.monotonic() - t0) * 1000)
 
-            log.task_done(task_id, result["provider"], result["model_name"],
-                          result["tokens"], ms)
+            log.task_done(task_id, last_result["provider"], last_result["model_name"],
+                          last_result["tokens"], ms)
 
-            # ── Save agent output ─────────────────────────────────────────────
-            model_row = await db.fetchrow(
-                "SELECT model_id FROM models WHERE provider=$1 AND model_name=$2 LIMIT 1",
-                result["provider"], result["model_name"]
-            )
-            model_id = str(model_row["model_id"]) if model_row else None
+            # ── Save agent output (best-effort — don't retry LLM if DB fails) ──
+            try:
+                model_row = await db.fetchrow(
+                    "SELECT model_id FROM models WHERE provider=$1 AND model_name=$2 LIMIT 1",
+                    last_result["provider"], last_result["model_name"]
+                )
+                model_id = str(model_row["model_id"]) if model_row else None
 
-            await db.execute(
-                """INSERT INTO agent_outputs
-                   (subtask_id, model_id, agent, status, output,
-                    input_tokens, output_tokens, execution_time_ms, retry_count)
-                   VALUES ($1::uuid, $2::uuid, $3, 'done', $4, $5, $6, $7, $8)""",
-                task["subtask_id"], model_id,
-                f"{task_type}-agent", result["content"],
-                result["tokens"].get("input", 0),
-                result["tokens"].get("output", 0),
-                ms, attempt
-            )
+                await db.execute(
+                    """INSERT INTO agent_outputs
+                       (subtask_id, model_id, agent, status, output,
+                        input_tokens, output_tokens, execution_time_ms, retry_count)
+                       VALUES ($1::uuid, $2::uuid, $3, 'done', $4, $5, $6, $7, $8)""",
+                    task["subtask_id"], model_id,
+                    f"{task_type}-agent", last_result["content"],
+                    last_result["tokens"].get("input", 0),
+                    last_result["tokens"].get("output", 0),
+                    ms, attempt
+                )
+            except Exception as db_err:
+                log.info(f"agent_outputs insert failed (non-fatal): {str(db_err)[:100]}")
+
             await db.execute(
                 "UPDATE subtasks SET status='done', completed_at=NOW() "
                 "WHERE subtask_id=$1::uuid",
@@ -159,21 +165,28 @@ async def _run_single_task(task: dict, dep_context: str,
             if sse_emitter:
                 await sse_emitter("task.completed", {
                     "taskId": task_id,
-                    "provider": result["provider"],
-                    "model": result["model_name"],
-                    "tokens": result["tokens"],
+                    "task_label": task.get("task", task_id),
+                    "provider": last_result["provider"],
+                    "model": last_result["model_name"],
+                    "tokens": last_result["tokens"],
                     "executionMs": ms,
                 })
 
-            return {"task_id": task_id, "output": result["content"],
-                    "model": f"{result['provider']}/{result['model_name']}"}
+            return {"task_id": task_id, "output": last_result["content"],
+                    "model": f"{last_result['provider']}/{last_result['model_name']}"}
 
         except Exception as e:
             err = str(e)[:150]
-            excluded.append(result["model_name"] if "result" in dir() else "")
+            # Track which model failed so we don't retry it
+            if last_result:
+                excluded.append(last_result["model_name"])
+                failed_model = last_result["model_name"]
+            else:
+                failed_model = "?"
+            last_result = None  # reset for next attempt
+
             if attempt < MAX_RETRIES:
-                log.task_retry(task_id, attempt + 1,
-                               result.get("model_name", "?") if "result" in dir() else "?", err)
+                log.task_retry(task_id, attempt + 1, failed_model, err)
                 if sse_emitter:
                     await sse_emitter("task.retry", {"taskId": task_id, "attempt": attempt + 1, "error": err})
             else:
@@ -183,7 +196,7 @@ async def _run_single_task(task: dict, dep_context: str,
                     task["subtask_id"]
                 )
                 if sse_emitter:
-                    await sse_emitter("task.failed", {"taskId": task_id, "error": err})
+                    await sse_emitter("task.failed", {"taskId": task_id, "task_label": task.get("task", task_id), "error": err})
                 return {"task_id": task_id, "output": f"[FAILED] {err}", "model": "none"}
 
 
@@ -212,6 +225,7 @@ async def execute_workflow(workflow_id: str, sse_emitter=None):
     )
     tasks = [dict(r) for r in rows]
     for t in tasks:
+        t["subtask_id"] = str(t["subtask_id"])
         t["depends_on"] = list(t["depends_on"])
 
     waves = build_waves(tasks)
@@ -221,7 +235,11 @@ async def execute_workflow(workflow_id: str, sse_emitter=None):
         "UPDATE workflows SET status='running' WHERE workflow_id=$1::uuid", workflow_id
     )
     if sse_emitter:
-        await sse_emitter("workflow.started", {"workflowId": workflow_id, "totalWaves": total_waves})
+        await sse_emitter("workflow.started", {
+            "workflowId": workflow_id, 
+            "totalWaves": total_waves,
+            "tasks": tasks
+        })
 
     # Store outputs for context injection
     outputs: dict[str, str] = {}
@@ -243,6 +261,12 @@ async def execute_workflow(workflow_id: str, sse_emitter=None):
             log.task_start(t["task_id"], t["type"], 
                           model["provider"] if model else "auto",
                           model["model_name"] if model else "best-available")
+            if sse_emitter:
+                await sse_emitter("task.started", {
+                    "taskId": t["task_id"],
+                    "task": t["task"],
+                    "type": t["type"],
+                })
 
         # ── Build context from dependencies ────────────────────────────────
         async def _exec(task):
@@ -274,13 +298,13 @@ async def execute_workflow(workflow_id: str, sse_emitter=None):
         "UPDATE workflows SET status='done', result=$1::jsonb WHERE workflow_id=$2::uuid",
         result_json, workflow_id
     )
+
+    from .webhooks import dispatch_webhooks
+    await dispatch_webhooks(workflow_id, merged, outputs, sse_emitter=sse_emitter)
+
     if sse_emitter:
         await sse_emitter("workflow.completed", {"workflowId": workflow_id})
 
     log.workflow_done(workflow_id)
-    
-    # Fire off webhooks in the background so we don't block the API response
-    from .webhooks import dispatch_webhooks
-    asyncio.create_task(dispatch_webhooks(workflow_id, merged, outputs))
     
     return merged

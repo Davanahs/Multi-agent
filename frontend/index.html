@@ -1,0 +1,1723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NeuralFlow — Multi-Agent Orchestration OS</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Clash+Display:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+/* ═══════════════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════════════ */
+:root {
+  --ink:       #060810;
+  --ink2:      #090c14;
+  --ink3:      #0d1120;
+  --ink4:      #111928;
+  --border:    rgba(255,255,255,0.06);
+  --border2:   rgba(255,255,255,0.1);
+  --text:      #d8e4f0;
+  --muted:     #4a627a;
+  --dim:       #1e2c3a;
+  
+  /* Brand accents — teal/mint to match reference */
+  --teal:      #00e8c6;
+  --teal2:     #00c4a7;
+  --teal-glow: rgba(0,232,198,0.18);
+  --teal-dim:  rgba(0,232,198,0.07);
+  --blue:      #2563ff;
+  --blue-glow: rgba(37,99,255,0.2);
+  --violet:    #7c3aed;
+  --violet-glow: rgba(124,58,237,0.2);
+  --amber:     #f59e0b;
+  --red:       #ef4444;
+  --green:     #10b981;
+  --green-glow: rgba(16,185,129,0.2);
+  
+  --radius:    10px;
+  --glass:     rgba(13,17,32,0.7);
+  --glass2:    rgba(13,17,32,0.85);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'DM Mono', monospace;
+  background: var(--ink);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--ink); }
+::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 3px; }
+
+/* ═══════════════════════════════════════════════
+   GLOBAL CANVAS BG
+═══════════════════════════════════════════════ */
+#bg-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+
+.bg-glow-1 {
+  position: fixed; pointer-events: none; z-index: 0;
+  top: -20vh; left: -10vw;
+  width: 60vw; height: 60vh;
+  background: radial-gradient(ellipse at center, rgba(0,232,198,0.08) 0%, transparent 70%);
+  filter: blur(40px);
+}
+.bg-glow-2 {
+  position: fixed; pointer-events: none; z-index: 0;
+  bottom: -20vh; right: -10vw;
+  width: 60vw; height: 60vh;
+  background: radial-gradient(ellipse at center, rgba(124,58,237,0.1) 0%, transparent 70%);
+  filter: blur(40px);
+}
+.noise {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.scanlines {
+  position: fixed; inset: 0; z-index: 2; pointer-events: none;
+  background: repeating-linear-gradient(transparent, transparent 3px, rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 4px);
+  opacity: 0.4;
+}
+
+/* ═══════════════════════════════════════════════
+   PAGE VIEWS
+═══════════════════════════════════════════════ */
+.page { position: relative; z-index: 10; }
+#page-landing { display: block; }
+#page-dashboard { display: none; min-height: 100vh; }
+
+/* ═══════════════════════════════════════════════
+   LANDING PAGE
+═══════════════════════════════════════════════ */
+.landing-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 48px;
+  background: rgba(6,8,16,0.5);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-logo {
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 18px; letter-spacing: 0.05em; color: #fff;
+}
+.logo-hex {
+  width: 28px; height: 28px; position: relative;
+}
+.logo-hex svg { animation: hex-spin 8s linear infinite; }
+@keyframes hex-spin { to { transform: rotate(360deg); } }
+.nav-links { display: flex; gap: 32px; }
+.nav-links a {
+  font-size: 12px; color: var(--muted); text-decoration: none;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--teal); }
+.nav-cta {
+  background: transparent;
+  border: 1px solid var(--teal);
+  color: var(--teal);
+  padding: 8px 20px;
+  border-radius: var(--radius);
+  font-family: 'DM Mono', monospace;
+  font-size: 12px; letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.nav-cta:hover { background: var(--teal-dim); box-shadow: 0 0 20px var(--teal-glow); }
+
+/* HERO */
+.hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center;
+  padding: 120px 24px 80px;
+  position: relative;
+}
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid rgba(0,232,198,0.3);
+  background: rgba(0,232,198,0.06);
+  padding: 6px 16px; border-radius: 100px;
+  font-size: 11px; color: var(--teal); letter-spacing: 0.1em;
+  margin-bottom: 32px;
+  animation: fade-up 0.6s ease both;
+}
+.hero-badge-dot { width: 6px; height: 6px; background: var(--teal); border-radius: 50%; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(0.8); } }
+
+.hero-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: clamp(48px, 8vw, 96px);
+  line-height: 1.0;
+  letter-spacing: -0.02em;
+  color: #fff;
+  animation: fade-up 0.7s 0.1s ease both;
+  max-width: 900px;
+}
+.hero-title .accent {
+  background: linear-gradient(135deg, var(--teal) 0%, #00a8ff 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero-sub {
+  margin-top: 20px;
+  font-size: 16px; color: var(--muted); max-width: 520px; line-height: 1.7;
+  animation: fade-up 0.7s 0.2s ease both;
+  font-family: 'DM Mono', monospace; font-weight: 300;
+}
+.hero-actions {
+  display: flex; gap: 16px; margin-top: 40px; flex-wrap: wrap; justify-content: center;
+  animation: fade-up 0.7s 0.3s ease both;
+}
+.btn-primary {
+  display: flex; align-items: center; gap: 8px;
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal2) 100%);
+  color: #060810; font-family: 'Syne', sans-serif;
+  font-weight: 700; font-size: 14px; letter-spacing: 0.05em;
+  padding: 14px 32px; border-radius: var(--radius); border: none;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,232,198,0.4); }
+.btn-secondary {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--glass); border: 1px solid var(--border2);
+  color: var(--text); font-family: 'DM Mono', monospace;
+  font-size: 13px; padding: 14px 28px; border-radius: var(--radius);
+  cursor: pointer; transition: all 0.2s; text-decoration: none;
+}
+.btn-secondary:hover { border-color: var(--teal); color: var(--teal); }
+
+/* FLOATING ROBOT VISUALIZATION */
+.hero-visual {
+  margin-top: 60px;
+  position: relative;
+  animation: fade-up 0.8s 0.4s ease both;
+  width: 100%; max-width: 860px;
+}
+.terminal-preview {
+  background: var(--ink3);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,232,198,0.1), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.terminal-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 20px;
+  background: rgba(0,0,0,0.3);
+  border-bottom: 1px solid var(--border);
+}
+.t-dot { width: 10px; height: 10px; border-radius: 50%; }
+.t-dot.r { background: #ef4444; } .t-dot.y { background: #f59e0b; } .t-dot.g { background: #10b981; }
+.t-title { margin-left: auto; margin-right: auto; font-size: 11px; color: var(--muted); }
+.terminal-body { padding: 24px; text-align: left; font-size: 12px; line-height: 1.8; }
+.t-line { display: flex; gap: 12px; }
+.t-prompt { color: var(--teal); } .t-cmd { color: #fff; } .t-out { color: var(--muted); }
+.t-wave { color: var(--amber); } .t-agent { color: #818cf8; } .t-success { color: var(--green); }
+.t-cursor { display: inline-block; width: 8px; height: 14px; background: var(--teal); animation: blink 1s step-end infinite; vertical-align: middle; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* FEATURES */
+.features {
+  padding: 100px 48px;
+  max-width: 1200px; margin: 0 auto;
+}
+.section-label {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 11px; color: var(--teal); letter-spacing: 0.15em; text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.section-label::after { content: ''; flex: 1; height: 1px; background: var(--border2); }
+.section-title {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(32px, 4vw, 48px); color: #fff; margin-bottom: 60px;
+  line-height: 1.1;
+}
+.features-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;
+}
+.feat-card {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  transition: all 0.3s;
+  position: relative; overflow: hidden;
+}
+.feat-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--teal), transparent);
+  opacity: 0; transition: opacity 0.3s;
+}
+.feat-card:hover { border-color: rgba(0,232,198,0.2); transform: translateY(-3px); box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+.feat-card:hover::before { opacity: 1; }
+.feat-icon {
+  width: 44px; height: 44px;
+  background: var(--teal-dim); border: 1px solid rgba(0,232,198,0.2);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; margin-bottom: 16px;
+}
+.feat-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 8px; }
+.feat-desc { font-size: 12px; color: var(--muted); line-height: 1.7; }
+
+/* STATS */
+.stats-section {
+  padding: 60px 48px;
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 40px; max-width: 1200px; margin: 0 auto;
+}
+.stat-item { text-align: center; }
+.stat-num { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 48px; color: #fff; }
+.stat-num .accent { color: var(--teal); }
+.stat-label { font-size: 11px; color: var(--muted); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.1em; }
+
+/* ═══════════════════════════════════════════════
+   DASHBOARD LAYOUT
+═══════════════════════════════════════════════ */
+.dash-layout {
+  display: grid;
+  grid-template-rows: 58px 1fr;
+  grid-template-columns: 280px 1fr 340px;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* TOPBAR */
+.dash-top {
+  grid-column: 1 / -1; grid-row: 1;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px;
+  background: rgba(6,8,16,0.9);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  z-index: 50;
+}
+.dash-logo { display: flex; align-items: center; gap: 10px; }
+.dash-logo-text { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 16px; letter-spacing: 0.08em; color: #fff; }
+.dash-sep { width: 1px; height: 28px; background: var(--border2); margin: 0 16px; }
+.dash-tagline { font-size: 10px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+
+.top-metrics { display: flex; gap: 8px; }
+.top-metric {
+  background: var(--ink3); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 12px;
+  display: flex; align-items: center; gap: 8px; font-size: 10px;
+}
+.top-metric .lbl { color: var(--muted); }
+.top-metric .val { color: var(--teal); font-weight: 500; }
+
+.top-right { display: flex; align-items: center; gap: 12px; }
+.status-badge {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; padding: 4px 10px;
+  border: 1px solid var(--border); border-radius: 6px;
+  transition: all 0.3s;
+}
+.status-badge .s-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.status-badge.ready .s-dot { background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
+.status-badge.running .s-dot { background: var(--teal); box-shadow: 0 0 8px var(--teal-glow); animation: pulse 1.5s infinite; }
+.status-badge.error .s-dot { background: var(--red); }
+.btn-back {
+  background: transparent; border: 1px solid var(--border2);
+  color: var(--muted); font-family: 'DM Mono', monospace;
+  font-size: 11px; padding: 6px 14px; border-radius: 6px;
+  cursor: pointer; transition: all 0.2s; letter-spacing: 0.05em;
+}
+.btn-back:hover { color: var(--teal); border-color: var(--teal); }
+
+/* SIDEBAR */
+.dash-sidebar {
+  grid-column: 1; grid-row: 2;
+  background: var(--ink2);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-section-hdr {
+  padding: 16px 20px 8px;
+  font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.15em;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-prompt-input {
+  padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.prompt-area {
+  background: var(--ink3); border: 1px solid var(--border2);
+  border-radius: 8px; padding: 10px 12px;
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  color: var(--text); resize: none; height: 80px; outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+}
+.prompt-area:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-dim); }
+.prompt-area::placeholder { color: var(--dim); }
+
+.btn-execute {
+  width: 100%;
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal2) 100%);
+  border: none; border-radius: 8px;
+  color: #060810; font-family: 'Syne', sans-serif;
+  font-weight: 700; font-size: 13px; letter-spacing: 0.05em;
+  padding: 11px; cursor: pointer;
+  transition: all 0.15s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-execute:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,232,198,0.35); }
+.btn-execute:active:not(:disabled) { transform: scale(0.98); }
+.btn-execute:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.history-list { flex: 1; overflow-y: auto; padding: 8px 12px; }
+.hist-item {
+  padding: 10px 12px; border-radius: 8px; cursor: pointer;
+  transition: background 0.15s; margin-bottom: 4px;
+  display: flex; flex-direction: column; gap: 3px;
+  border: 1px solid transparent;
+}
+.hist-item:hover { background: var(--ink3); border-color: var(--border); }
+.hist-item.active { background: var(--ink3); border-color: rgba(0,232,198,0.2); }
+.hist-prompt { font-size: 11px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hist-meta { display: flex; gap: 8px; align-items: center; }
+.hist-id { font-size: 9px; color: var(--muted); }
+.hist-status { font-size: 9px; padding: 1px 6px; border-radius: 4px; }
+.hist-status.done { color: var(--green); background: var(--green-glow); }
+.hist-status.running { color: var(--teal); background: var(--teal-dim); }
+.hist-status.failed { color: var(--red); background: rgba(239,68,68,0.1); }
+.hist-empty { text-align: center; color: var(--muted); font-size: 11px; padding: 24px; }
+
+/* MAIN PIPELINE AREA */
+.dash-main {
+  grid-column: 2; grid-row: 2;
+  overflow-y: auto;
+  display: flex; flex-direction: column;
+  background: var(--ink);
+}
+
+/* Empty State */
+.empty-state {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; padding: 40px;
+  text-align: center;
+}
+.empty-icon { font-size: 48px; opacity: 0.3; animation: float 4s ease-in-out infinite; }
+@keyframes float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
+.empty-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 20px; color: var(--muted); }
+.empty-sub { font-size: 12px; color: var(--dim); max-width: 280px; line-height: 1.6; }
+
+/* Pipeline view */
+.pipeline-view { padding: 24px; display: flex; flex-direction: column; gap: 24px; }
+
+.pipeline-hdr {
+  display: flex; align-items: center; gap: 16px;
+  padding-bottom: 16px; border-bottom: 1px solid var(--border);
+}
+.pipeline-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px; color: #fff; }
+.pipeline-wf-id { font-size: 10px; color: var(--teal); font-family: 'DM Mono', monospace; }
+.pipeline-stats { display: flex; gap: 12px; margin-left: auto; }
+.p-stat { font-size: 10px; }
+.p-stat .v { color: #fff; font-weight: 500; }
+.p-stat .l { color: var(--muted); margin-left: 4px; }
+
+/* Phase: Planning */
+.phase-card {
+  background: var(--ink3); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+}
+.phase-hdr {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,0,0,0.2);
+}
+.phase-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--ink); border: 1px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: var(--muted); font-weight: 700; flex-shrink: 0;
+}
+.phase-num.active { border-color: var(--teal); color: var(--teal); animation: pulse-border 2s infinite; }
+.phase-num.done { background: var(--green); border-color: var(--green); color: #fff; }
+.phase-num.error { background: var(--red); border-color: var(--red); color: #fff; }
+@keyframes pulse-border { 0%,100%{box-shadow:0 0 0 0 rgba(0,232,198,0.3);} 50%{box-shadow:0 0 0 6px rgba(0,232,198,0);} }
+.phase-label { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px; }
+.phase-label.active { color: var(--teal); }
+.phase-label.done { color: var(--text); }
+.phase-label.pending { color: var(--muted); }
+.phase-time { margin-left: auto; font-size: 10px; color: var(--muted); }
+.phase-body { padding: 16px 20px; }
+
+/* Planning output */
+.planning-output { font-size: 11px; color: var(--text); font-family: 'DM Mono', monospace; line-height: 1.7; }
+.planning-output .k { color: var(--teal); }
+.planning-output .v { color: var(--amber); }
+
+/* WAVES */
+.waves-container { display: flex; flex-direction: column; gap: 20px; }
+.wave-group { position: relative; }
+.wave-label {
+  font-size: 9px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.12em; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.wave-label .wnum { color: var(--amber); font-weight: 500; }
+.wave-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.wave-tasks { display: grid; gap: 12px; }
+
+/* TASK CARDS */
+.task-card {
+  background: var(--ink4); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px;
+  transition: all 0.3s; position: relative; overflow: hidden;
+}
+.task-card::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--border2); transition: background 0.3s;
+}
+.task-card.running::before { background: var(--teal); box-shadow: 0 0 12px var(--teal-glow); }
+.task-card.done::before { background: var(--green); }
+.task-card.failed::before { background: var(--red); }
+.task-card.pending::before { background: var(--border2); }
+
+.task-card.running { border-color: rgba(0,232,198,0.15); }
+.task-card.done { border-color: rgba(16,185,129,0.1); }
+.task-card.failed { border-color: rgba(239,68,68,0.15); }
+
+.task-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.task-id {
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  background: var(--ink); border: 1px solid var(--border2);
+  padding: 2px 8px; border-radius: 4px; color: var(--muted);
+}
+.task-agent-badge {
+  font-size: 10px; padding: 2px 8px; border-radius: 4px;
+  border: 1px solid; display: flex; align-items: center; gap: 4px;
+}
+.task-agent-badge.research { color: #818cf8; border-color: rgba(129,140,248,0.3); background: rgba(129,140,248,0.08); }
+.task-agent-badge.code { color: var(--teal); border-color: rgba(0,232,198,0.3); background: var(--teal-dim); }
+.task-agent-badge.writer { color: var(--amber); border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.08); }
+.task-agent-badge.analyst { color: #f472b6; border-color: rgba(244,114,182,0.3); background: rgba(244,114,182,0.08); }
+.task-agent-badge.planner { color: #34d399; border-color: rgba(52,211,153,0.3); background: rgba(52,211,153,0.08); }
+
+.task-status-icon { margin-left: auto; font-size: 14px; }
+.task-title { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 13px; color: var(--text); margin-bottom: 8px; }
+
+/* Progress bar for running tasks */
+.task-progress-track { height: 2px; background: var(--border); border-radius: 2px; margin-bottom: 10px; overflow: hidden; }
+.task-progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--teal), var(--blue)); transition: width 0.4s ease; border-radius: 2px; }
+.task-progress-fill.shimmer { animation: shimmer 1.5s infinite; }
+@keyframes shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
+}
+.task-progress-fill.running { background: linear-gradient(90deg, var(--teal) 0%, var(--blue) 50%, var(--teal) 100%); background-size: 200px 100%; animation: progress-anim 2s infinite; }
+@keyframes progress-anim { 0%{background-position:0 0;} 100%{background-position:200px 0;} }
+
+.task-metrics { display: flex; gap: 16px; flex-wrap: wrap; }
+.task-metric { font-size: 10px; }
+.task-metric .lbl { color: var(--muted); margin-right: 4px; }
+.task-metric .val { color: var(--text); }
+.task-metric .val.tokens { color: #818cf8; }
+.task-metric .val.time { color: var(--amber); }
+.task-metric .val.ok { color: var(--green); }
+
+.task-output {
+  margin-top: 12px; background: rgba(0,0,0,0.3);
+  border-left: 2px solid var(--green);
+  padding: 10px 12px;
+  border-radius: 0 6px 6px 0;
+  max-height: 0; overflow: hidden; opacity: 0;
+  transition: max-height 0.4s ease, opacity 0.3s;
+}
+.task-output.show { max-height: 200px; opacity: 1; overflow-y: auto; }
+.task-output-text { font-size: 11px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
+.task-error { margin-top: 10px; background: rgba(239,68,68,0.08); border-left: 2px solid var(--red); padding: 8px 12px; border-radius: 0 6px 6px 0; font-size: 11px; color: #fca5a5; }
+
+/* MERGE PHASE */
+.merge-phase {
+  background: var(--ink3); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px;
+  display: flex; align-items: center; gap: 16px;
+}
+.merge-anim { position: relative; width: 44px; height: 44px; flex-shrink: 0; }
+.merge-ring {
+  position: absolute; inset: 0; border: 2px solid var(--teal);
+  border-radius: 50%; border-top-color: transparent;
+  animation: spin 1.2s linear infinite;
+}
+.merge-ring-2 {
+  position: absolute; inset: 6px; border: 1px solid rgba(0,232,198,0.3);
+  border-radius: 50%; border-bottom-color: transparent;
+  animation: spin 2s linear infinite reverse;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.merge-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.merge-info { flex: 1; }
+.merge-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px; color: var(--teal); margin-bottom: 4px; }
+.merge-sub { font-size: 11px; color: var(--muted); }
+.merge-dots { display: flex; gap: 4px; align-items: center; }
+.merge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); animation: bounce-dot 1.4s infinite; }
+.merge-dot:nth-child(2) { animation-delay: 0.2s; }
+.merge-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce-dot { 0%,80%,100%{transform:scale(0.6);opacity:0.4;} 40%{transform:scale(1);opacity:1;} }
+
+/* RESULT PANEL */
+.result-section { border: 1px solid rgba(0,232,198,0.2); border-radius: 12px; overflow: hidden; background: var(--ink3); }
+.result-hdr {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 20px;
+  background: rgba(0,232,198,0.04);
+  border-bottom: 1px solid rgba(0,232,198,0.1);
+}
+.result-hdr-icon { font-size: 20px; }
+.result-hdr-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px; color: var(--teal); }
+.result-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+.result-tab {
+  padding: 10px 20px; font-size: 11px; color: var(--muted);
+  border-bottom: 2px solid transparent; cursor: pointer;
+  transition: all 0.2s; letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.result-tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+.result-tab-content { padding: 20px; display: none; }
+.result-tab-content.active { display: block; }
+.result-text { font-size: 12px; color: var(--text); line-height: 1.8; white-space: pre-wrap; font-family: 'DM Mono', monospace; }
+.result-actions { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+.btn-result-action {
+  font-family: 'DM Mono', monospace; font-size: 11px;
+  padding: 7px 16px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--muted); transition: all 0.2s;
+}
+.btn-result-action:hover { color: var(--teal); border-color: var(--teal); }
+.btn-result-action.primary { background: var(--teal-dim); color: var(--teal); border-color: rgba(0,232,198,0.3); }
+
+/* RIGHT PANEL — Event Stream */
+.dash-right {
+  grid-column: 3; grid-row: 2;
+  background: var(--ink2); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.right-hdr {
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.right-hdr-title {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--text); display: flex; align-items: center; gap: 8px;
+}
+.event-counter { font-size: 10px; color: var(--muted); background: var(--ink); border: 1px solid var(--border); padding: 2px 8px; border-radius: 4px; }
+
+.event-stream { flex: 1; overflow-y: auto; padding: 10px 14px; display: flex; flex-direction: column; gap: 3px; }
+.event-line {
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: 10px; padding: 5px 8px; border-radius: 5px;
+  transition: background 0.2s;
+  animation: slide-in-r 0.2s ease both;
+}
+@keyframes slide-in-r { from { transform: translateX(8px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.event-line:hover { background: rgba(255,255,255,0.02); }
+.e-time { color: var(--muted); flex-shrink: 0; font-size: 9px; margin-top: 1px; }
+.e-type {
+  padding: 1px 6px; border-radius: 3px; font-size: 9px; flex-shrink: 0;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.e-type.workflow { background: var(--teal-dim); color: var(--teal); }
+.e-type.task { background: rgba(129,140,248,0.1); color: #818cf8; }
+.e-type.wave { background: rgba(245,158,11,0.1); color: var(--amber); }
+.e-type.system { background: rgba(255,255,255,0.05); color: var(--muted); }
+.e-type.error { background: rgba(239,68,68,0.1); color: var(--red); }
+.e-type.success { background: var(--green-glow); color: var(--green); }
+.e-msg { color: var(--text); flex: 1; line-height: 1.5; }
+.e-msg .hl { color: var(--teal); }
+
+/* METRICS IN RIGHT PANEL */
+.right-metrics {
+  padding: 14px 18px; border-top: 1px solid var(--border);
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.right-metric-card {
+  background: var(--ink3); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px;
+}
+.rm-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.rm-value { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 22px; color: #fff; }
+.rm-value .unit { font-size: 11px; color: var(--muted); font-weight: 400; font-family: 'DM Mono', monospace; }
+.rm-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+/* ANIMATIONS */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fade-in 0.4s ease both; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* TOAST */
+.toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  background: var(--ink3); border: 1px solid var(--border2);
+  padding: 12px 20px; border-radius: 10px;
+  font-size: 12px; display: flex; align-items: center; gap: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  animation: slide-toast 0.3s ease;
+}
+@keyframes slide-toast { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.toast.success { border-color: rgba(16,185,129,0.3); }
+.toast.error { border-color: rgba(239,68,68,0.3); }
+
+/* Typing animation */
+.typing::after { content: '|'; animation: blink 0.8s step-end infinite; color: var(--teal); }
+
+/* Connection error banner */
+.conn-banner {
+  background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 8px; padding: 10px 16px;
+  font-size: 11px; color: #fca5a5;
+  display: flex; align-items: center; gap: 8px;
+}
+</style>
+</head>
+<body>
+
+<!-- BACKGROUND LAYERS -->
+<div class="bg-glow-1"></div>
+<div class="bg-glow-2"></div>
+<div class="noise"></div>
+<div class="scanlines"></div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ═══════════ LANDING PAGE ═══════════ -->
+<div id="page-landing" class="page">
+  <nav class="landing-nav">
+    <div class="nav-logo">
+      <div class="logo-hex">
+        <svg width="28" height="28" viewBox="0 0 28 28">
+          <polygon points="14 2 26 9 26 19 14 26 2 19 2 9" fill="none" stroke="#00e8c6" stroke-width="1.5" opacity="0.8"/>
+          <circle cx="14" cy="14" r="3" fill="#00e8c6"/>
+        </svg>
+      </div>
+      NeuralFlow
+    </div>
+    <div class="nav-links">
+      <a href="#">Docs</a>
+      <a href="#">Agents</a>
+      <a href="#">Pricing</a>
+      <a href="#">Blog</a>
+    </div>
+    <button class="nav-cta" onclick="showDashboard()">Launch Terminal →</button>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-badge">
+      <div class="hero-badge-dot"></div>
+      Multi-Agent Orchestration OS · v2.1 Live
+    </div>
+    <h1 class="hero-title">
+      Orchestrate <span class="accent">Intelligent</span><br/>Agent Networks
+    </h1>
+    <p class="hero-sub">Submit a prompt. Watch AI decompose, plan, parallelize, and execute complex multi-step workflows — live, in real time.</p>
+    <div class="hero-actions">
+      <button class="btn-primary" onclick="showDashboard()">
+        ⬡ Launch Terminal
+      </button>
+      <a class="btn-secondary" href="#">
+        ▶ View Architecture Docs
+      </a>
+    </div>
+
+    <!-- Terminal Preview -->
+    <div class="hero-visual">
+      <div class="terminal-preview">
+        <div class="terminal-header">
+          <div class="t-dot r"></div><div class="t-dot y"></div><div class="t-dot g"></div>
+          <div class="t-title">neuralflow — orchestration terminal</div>
+        </div>
+        <div class="terminal-body">
+          <div class="t-line"><span class="t-prompt">→</span><span class="t-cmd">POST /api/workflows {"prompt": "Research AI safety and draft a report"}</span></div>
+          <div class="t-line"><span class="t-out" style="color:var(--muted)">  workflow_id: wf-a3f9b2 · status: planning</span></div>
+          <div class="t-line" style="height:8px"></div>
+          <div class="t-line"><span class="t-wave">WAVE 1</span><span class="t-out"> [parallel]</span></div>
+          <div class="t-line"><span class="t-agent">  [T1] ResearchAgent</span><span class="t-out"> → scraping arxiv.org ············</span><span class="t-success"> ✓ 1842ms</span></div>
+          <div class="t-line"><span class="t-agent">  [T2] ResearchAgent</span><span class="t-out"> → querying papers database ······</span><span class="t-success"> ✓ 2103ms</span></div>
+          <div class="t-line" style="height:8px"></div>
+          <div class="t-line"><span class="t-wave">WAVE 2</span><span class="t-out"> [sequential]</span></div>
+          <div class="t-line"><span class="t-agent">  [T3] WriterAgent</span><span class="t-out"> → synthesizing findings ·········</span><span class="t-success"> ✓ 3451ms</span></div>
+          <div class="t-line" style="height:8px"></div>
+          <div class="t-line"><span class="t-success">✓ workflow.completed</span><span class="t-out"> · 3 tasks · 5 agents · 7.4s total</span></div>
+          <div class="t-line"><span class="t-prompt">→</span><span class="t-cursor"></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <div style="max-width:1200px;margin:0 auto;padding:0 48px;">
+    <div class="stats-section">
+      <div class="stat-item">
+        <div class="stat-num"><span class="accent">∞</span></div>
+        <div class="stat-label">Parallel Agents</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">< <span class="accent">200</span><span style="font-size:24px">ms</span></div>
+        <div class="stat-label">Planning Latency</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num"><span class="accent">99.9</span><span style="font-size:24px">%</span></div>
+        <div class="stat-label">Uptime SLA</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num"><span class="accent">Live</span></div>
+        <div class="stat-label">SSE Event Streaming</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <section class="features">
+    <div class="section-label">Capabilities</div>
+    <h2 class="section-title">Everything you need to<br/>orchestrate intelligence</h2>
+    <div class="features-grid">
+      <div class="feat-card">
+        <div class="feat-icon">⬡</div>
+        <div class="feat-title">DAG Task Planning</div>
+        <div class="feat-desc">Automatic decomposition of complex prompts into dependency-aware task graphs with parallel wave execution.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">⚡</div>
+        <div class="feat-title">Live SSE Streaming</div>
+        <div class="feat-desc">Real-time Server-Sent Events for every task state change, wave start, and agent assignment update.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">🤖</div>
+        <div class="feat-title">Multi-Agent Routing</div>
+        <div class="feat-desc">Research, Code, Writer, Analyst, and Planner agents automatically assigned per task semantics.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">♻</div>
+        <div class="feat-title">Retry & Recovery</div>
+        <div class="feat-desc">Automatic failure detection, retry logic, and graceful degradation without halting the pipeline.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">📊</div>
+        <div class="feat-title">Token & Timing Metrics</div>
+        <div class="feat-desc">Per-task token consumption, execution time, and model performance tracked at the agent level.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">🗄</div>
+        <div class="feat-title">Session Persistence</div>
+        <div class="feat-desc">All workflows persisted to database with full history, replay, and result retrieval via REST API.</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═══════════ DASHBOARD PAGE ═══════════ -->
+<div id="page-dashboard" class="page">
+  <div class="dash-layout">
+
+    <!-- TOPBAR -->
+    <header class="dash-top">
+      <div class="dash-logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" style="flex-shrink:0">
+          <polygon points="12 2 22 8 22 16 12 22 2 16 2 8" fill="none" stroke="#00e8c6" stroke-width="1.5" opacity="0.8"/>
+          <circle cx="12" cy="12" r="2.5" fill="#00e8c6"/>
+        </svg>
+        <span class="dash-logo-text">NeuralFlow</span>
+      </div>
+      <div class="dash-sep"></div>
+      <div class="dash-tagline">Orchestration Terminal</div>
+      <div style="flex:1"></div>
+
+      <div class="top-metrics">
+        <div class="top-metric"><span class="lbl">CPU</span><span class="val" id="met-cpu">34%</span></div>
+        <div class="top-metric"><span class="lbl">MEM</span><span class="val" id="met-mem">2.1GB</span></div>
+        <div class="top-metric"><span class="lbl">LATENCY</span><span class="val" id="met-lat">12ms</span></div>
+        <div class="top-metric"><span class="lbl">BACKEND</span><span class="val" id="met-backend" style="color:var(--amber)">···</span></div>
+      </div>
+
+      <div class="top-right" style="margin-left:16px">
+        <div class="status-badge ready" id="global-status-badge">
+          <div class="s-dot"></div>
+          <span id="global-status-txt">READY</span>
+        </div>
+        <button class="btn-back" onclick="showLanding()">← Landing</button>
+      </div>
+    </header>
+
+    <!-- SIDEBAR -->
+    <aside class="dash-sidebar">
+      <div class="sidebar-section-hdr">▸ PROMPT TERMINAL</div>
+      <div class="sidebar-prompt-input">
+        <textarea class="prompt-area" id="prompt-input" placeholder="Describe your workflow goal...&#10;e.g. Research quantum computing and write a technical summary"></textarea>
+        
+        <div style="margin-top: 10px; margin-bottom: 15px; padding: 10px; background: rgba(0,232,198,0.05); border: 1px solid rgba(0,232,198,0.2); border-radius: 6px;">
+          <div style="font-size: 11px; color: var(--teal); margin-bottom: 8px; font-weight: 500;">▸ WEBHOOKS (Optional)</div>
+          <input type="text" id="webhook-discord" placeholder="Discord Webhook URL" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:8px; border-radius:4px; font-size:11px; margin-bottom:8px;">
+          <input type="text" id="webhook-github" placeholder="GitHub Dispatch URL" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:8px; border-radius:4px; font-size:11px;">
+        </div>
+
+        <div id="conn-error" class="conn-banner" style="display:none">
+          ⚠ Backend offline. Check http://localhost:8080
+        </div>
+        <button class="btn-execute" id="btn-execute" onclick="startWorkflow()">
+          <span id="btn-text">⬡ EXECUTE WORKFLOW</span>
+        </button>
+      </div>
+
+      <div class="sidebar-section-hdr">▸ HISTORY</div>
+      <div class="history-list" id="history-list">
+        <div class="hist-empty">No workflows yet</div>
+      </div>
+    </aside>
+
+    <!-- MAIN PIPELINE -->
+    <main class="dash-main" id="dash-main">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">⬡</div>
+        <div class="empty-title">Pipeline Ready</div>
+        <div class="empty-sub">Submit a prompt to begin orchestrating your multi-agent workflow. The execution DAG will appear here in real time.</div>
+      </div>
+      <div class="pipeline-view" id="pipeline-view" style="display:none"></div>
+    </main>
+
+    <!-- RIGHT EVENT STREAM -->
+    <aside class="dash-right">
+      <div class="right-hdr">
+        <div class="right-hdr-title">
+          <div class="s-dot" style="width:6px;height:6px;border-radius:50%;background:var(--teal);animation:pulse 1.5s infinite"></div>
+          SSE Event Stream
+        </div>
+        <div class="event-counter" id="event-counter">0 events</div>
+      </div>
+
+      <div class="event-stream" id="event-stream"></div>
+
+      <div class="right-metrics">
+        <div class="right-metric-card">
+          <div class="rm-label">Workflows Run</div>
+          <div class="rm-value" id="rm-wf">0</div>
+          <div class="rm-sub">this session</div>
+        </div>
+        <div class="right-metric-card">
+          <div class="rm-label">Agents Deployed</div>
+          <div class="rm-value" id="rm-ag">0</div>
+          <div class="rm-sub">total tasks</div>
+        </div>
+        <div class="right-metric-card">
+          <div class="rm-label">Avg Duration</div>
+          <div class="rm-value" id="rm-dur">—<span class="unit"></span></div>
+          <div class="rm-sub">last workflow</div>
+        </div>
+        <div class="right-metric-card">
+          <div class="rm-label">Success Rate</div>
+          <div class="rm-value" id="rm-sr">—<span class="unit">%</span></div>
+          <div class="rm-sub">all time</div>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════ */
+const API = 'http://localhost:8000';
+const state = {
+  running: false,
+  currentWfId: null,
+  tasks: {},       // taskId -> {status, agent, output, tokens, timeMs, error}
+  plan: null,
+  eventCount: 0,
+  sseSource: null,
+  sessionWfCount: 0,
+  sessionAgentCount: 0,
+  durations: [],
+  successes: 0,
+  failures: 0,
+  wfStart: null,
+};
+
+/* ═══════════════════════════════════════════
+   PAGE NAVIGATION
+═══════════════════════════════════════════ */
+function showDashboard() {
+  document.getElementById('page-landing').style.display = 'none';
+  document.getElementById('page-dashboard').style.display = 'block';
+  checkBackend();
+  loadHistory();
+}
+function showLanding() {
+  document.getElementById('page-landing').style.display = 'block';
+  document.getElementById('page-dashboard').style.display = 'none';
+}
+
+/* ═══════════════════════════════════════════
+   BACKEND HEALTH CHECK
+═══════════════════════════════════════════ */
+async function checkBackend() {
+  const el = document.getElementById('met-backend');
+  try {
+    const r = await fetch(`${API}/api/workflows`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      el.textContent = 'ONLINE'; el.style.color = 'var(--green)';
+      document.getElementById('conn-error').style.display = 'none';
+    } else { throw new Error(); }
+  } catch {
+    el.textContent = 'OFFLINE'; el.style.color = 'var(--red)';
+    document.getElementById('conn-error').style.display = 'flex';
+  }
+}
+
+/* ═══════════════════════════════════════════
+   HISTORY
+═══════════════════════════════════════════ */
+async function loadHistory() {
+  try {
+    const r = await fetch(`${API}/api/workflows`);
+    if (!r.ok) return;
+    const data = await r.json();
+    const workflows = Array.isArray(data) ? data : (data.workflows || []);
+    renderHistory(workflows);
+  } catch(e) { /* backend might be offline */ }
+}
+
+function renderHistory(workflows) {
+  const el = document.getElementById('history-list');
+  if (!workflows || workflows.length === 0) {
+    el.innerHTML = '<div class="hist-empty">No workflows yet</div>';
+    return;
+  }
+  el.innerHTML = workflows.slice(0, 20).map(wf => {
+    const st = wf.status || 'unknown';
+    const statusClass = st === 'done' || st === 'completed' ? 'done'
+                      : st === 'running' || st === 'planning' ? 'running' : 'failed';
+    const prompt = wf.prompt || wf.workflow_id || '(no prompt)';
+    return `<div class="hist-item" onclick="loadWorkflow('${wf.workflow_id}')">
+      <div class="hist-prompt">${escHtml(prompt)}</div>
+      <div class="hist-meta">
+        <span class="hist-id">${wf.workflow_id}</span>
+        <span class="hist-status ${statusClass}">${st.toUpperCase()}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadWorkflow(wfId) {
+  // Load a historical workflow result
+  try {
+    const r = await fetch(`${API}/api/workflows/${wfId}/result`);
+    if (!r.ok) return;
+    const data = await r.json();
+    // Render a static result view
+    showPipelineView();
+    renderStaticResult(wfId, data);
+  } catch(e) { toast('Failed to load workflow', 'error'); }
+}
+
+function renderStaticResult(wfId, data) {
+  const pv = document.getElementById('pipeline-view');
+  pv.innerHTML = `
+    <div class="pipeline-hdr">
+      <div class="pipeline-title">Pipeline Result</div>
+      <div class="pipeline-wf-id">${wfId}</div>
+    </div>
+    <div class="result-section">
+      <div class="result-hdr">
+        <div class="result-hdr-icon">✦</div>
+        <div class="result-hdr-title">Workflow Result</div>
+        <div style="margin-left:auto;font-size:10px;color:var(--green)">● COMPLETED</div>
+      </div>
+      <div class="result-tabs">
+        <div class="result-tab active" onclick="switchTab(this,'rt-sum')">Summary</div>
+        <div class="result-tab" onclick="switchTab(this,'rt-raw')">Task Outputs</div>
+      </div>
+      <div id="rt-sum" class="result-tab-content active">
+        <div class="result-text">${escHtml(data.result || '(no result)')}</div>
+      </div>
+      <div id="rt-raw" class="result-tab-content">
+        <div class="result-text">${escHtml(JSON.stringify(data.task_outputs || {}, null, 2))}</div>
+      </div>
+    </div>
+  `;
+}
+
+/* ═══════════════════════════════════════════
+   WORKFLOW EXECUTION
+═══════════════════════════════════════════ */
+async function startWorkflow() {
+  const prompt = document.getElementById('prompt-input').value.trim();
+  if (!prompt) { toast('Enter a prompt first', 'error'); return; }
+  if (state.running) return;
+
+  // Gather webhooks
+  const discordUrl = document.getElementById('webhook-discord')?.value.trim();
+  const githubUrl = document.getElementById('webhook-github')?.value.trim();
+  const webhooks = [];
+  if (discordUrl) {
+    webhooks.push({ event_type: "workflow.completed", webhook_url: discordUrl });
+  }
+  if (githubUrl) {
+    webhooks.push({ event_type: "workflow.completed", webhook_url: githubUrl, payload: { event_type: "project_generated" } });
+  }
+
+  // Reset
+  state.running = true;
+  state.tasks = {};
+  state.plan = null;
+  state.wfStart = Date.now();
+  if (state.sseSource) { state.sseSource.close(); state.sseSource = null; }
+
+  setBtnState('running');
+  setGlobalStatus('running', 'PLANNING');
+  clearEventStream();
+  showPipelineView();
+
+  addEvent('system', 'Connecting to backend…');
+
+  try {
+    // POST to start workflow
+    const resp = await fetch(`${API}/api/workflows`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, webhooks })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      throw new Error(err || `HTTP ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    if (!data.success && data.workflow_id === undefined) throw new Error('Invalid response from backend');
+
+    const wfId = data.workflow_id;
+    state.currentWfId = wfId;
+
+    addEvent('workflow', `Workflow created: <span class="hl">${wfId}</span>`);
+    renderPipelineHeader(wfId, prompt);
+
+    // Start SSE stream
+    listenSSE(wfId);
+
+  } catch(e) {
+    state.running = false;
+    setBtnState('ready');
+    setGlobalStatus('ready', 'READY');
+    addEvent('error', `Failed to start: ${e.message}`);
+    toast(`Backend error: ${e.message}`, 'error');
+    document.getElementById('conn-error').style.display = 'flex';
+  }
+}
+
+function listenSSE(wfId) {
+  const url = `${API}/api/workflows/${wfId}/stream`;
+  const src = new EventSource(url);
+  state.sseSource = src;
+
+  src.onopen = () => {
+    addEvent('system', 'SSE stream connected');
+    document.getElementById('conn-error').style.display = 'none';
+  };
+
+  src.onerror = (e) => {
+    if (src.readyState === EventSource.CLOSED) {
+      addEvent('system', 'SSE stream closed');
+    } else {
+      addEvent('error', 'SSE connection error — retrying…');
+    }
+  };
+
+  // Handle named events
+  const handleEvent = (type, rawData) => {
+    state.eventCount++;
+    document.getElementById('event-counter').textContent = `${state.eventCount} events`;
+    try {
+      const payload = JSON.parse(rawData);
+      processSSEEvent(type, payload);
+    } catch(e) {
+      addEvent('system', `Raw: ${rawData}`);
+    }
+  };
+
+  // Listen for all event types
+  ['workflow.planned','wave.started','task.started','task.completed','task.failed',
+   'workflow.merging','workflow.completed','workflow.failed'].forEach(evtName => {
+    src.addEventListener(evtName, (e) => handleEvent(evtName, e.data));
+  });
+
+  // Fallback: message event
+  src.onmessage = (e) => {
+    if (e.data) handleEvent('message', e.data);
+  };
+}
+
+function processSSEEvent(type, payload) {
+  switch(type) {
+    case 'workflow.planned':
+      addEvent('workflow', `Plan received: <span class="hl">${payload.plan?.totalTasks} tasks</span> across <span class="hl">${payload.plan?.totalWaves} waves</span>`);
+      renderPlan(payload.plan);
+      break;
+
+    case 'wave.started':
+      addEvent('wave', `Wave <span class="hl">${payload.wave}</span> started: [${(payload.tasks||[]).join(', ')}]`);
+      highlightWave(payload.wave);
+      break;
+
+    case 'task.started':
+      addEvent('task', `Task <span class="hl">${payload.taskId}</span> → agent: <span class="hl">${payload.agent}</span>`);
+      setTaskState(payload.taskId, 'running', { agent: payload.agent });
+      state.sessionAgentCount++;
+      document.getElementById('rm-ag').textContent = state.sessionAgentCount;
+      break;
+
+    case 'task.completed':
+      addEvent('success', `Task <span class="hl">${payload.taskId}</span> done · ${payload.tokens} tokens · ${payload.timeMs}ms`);
+      setTaskState(payload.taskId, 'done', {
+        agent: payload.agent, output: payload.output,
+        tokens: payload.tokens, timeMs: payload.timeMs
+      });
+      break;
+
+    case 'task.failed':
+      addEvent('error', `Task <span class="hl">${payload.taskId}</span> failed: ${payload.error}`);
+      setTaskState(payload.taskId, 'failed', { error: payload.error });
+      break;
+
+    case 'workflow.merging':
+      addEvent('workflow', 'Merger agent synthesizing final output…');
+      showMergePhase();
+      setGlobalStatus('running', 'MERGING');
+      break;
+
+    case 'workflow.completed':
+      addEvent('success', `Workflow <span class="hl">${payload.workflowId}</span> completed`);
+      if (state.sseSource) { state.sseSource.close(); }
+      state.running = false;
+      state.successes++;
+      const dur = Date.now() - state.wfStart;
+      state.durations.push(dur);
+      setBtnState('ready');
+      setGlobalStatus('ready', 'READY');
+      updateMetricsPost(dur);
+      fetchResult(payload.workflowId);
+      loadHistory();
+      break;
+
+    case 'workflow.failed':
+      addEvent('error', `Workflow failed: ${payload.error}`);
+      if (state.sseSource) { state.sseSource.close(); }
+      state.running = false;
+      state.failures++;
+      setBtnState('ready');
+      setGlobalStatus('error', 'FAILED');
+      toast('Workflow failed — see event stream for details', 'error');
+      break;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   PIPELINE RENDERING
+═══════════════════════════════════════════ */
+function showPipelineView() {
+  document.getElementById('empty-state').style.display = 'none';
+  const pv = document.getElementById('pipeline-view');
+  pv.style.display = 'flex';
+  pv.innerHTML = '';
+}
+
+function renderPipelineHeader(wfId, prompt) {
+  const pv = document.getElementById('pipeline-view');
+
+  const hdr = document.createElement('div');
+  hdr.className = 'pipeline-hdr fade-in';
+  hdr.innerHTML = `
+    <div class="pipeline-title">Workflow Pipeline</div>
+    <div class="pipeline-wf-id">${wfId}</div>
+    <div class="pipeline-stats" id="pipeline-stats">
+      <div class="p-stat"><span class="v" id="p-tasks">—</span><span class="l">tasks</span></div>
+      <div class="p-stat"><span class="v" id="p-waves">—</span><span class="l">waves</span></div>
+      <div class="p-stat"><span class="v" id="p-elapsed" style="color:var(--amber)">0s</span><span class="l">elapsed</span></div>
+    </div>
+  `;
+  pv.appendChild(hdr);
+
+  // Prompt card
+  const pc = document.createElement('div');
+  pc.className = 'phase-card fade-in';
+  pc.innerHTML = `
+    <div class="phase-hdr">
+      <div class="phase-num active">1</div>
+      <div class="phase-label active">Intent Analysis & Planning</div>
+      <div class="phase-time" id="plan-time">—</div>
+    </div>
+    <div class="phase-body">
+      <div class="planning-output" id="plan-output">
+        <span class="k">prompt:</span> <span class="v">"${escHtml(prompt)}"</span><br>
+        <span class="k">status:</span> analyzing intent…
+      </div>
+    </div>
+  `;
+  pv.appendChild(pc);
+
+  // Waves container placeholder
+  const wc = document.createElement('div');
+  wc.id = 'waves-container';
+  wc.className = 'waves-container';
+  pv.appendChild(wc);
+
+  // Merge placeholder
+  const mp = document.createElement('div');
+  mp.id = 'merge-container';
+  pv.appendChild(mp);
+
+  // Result placeholder
+  const rp = document.createElement('div');
+  rp.id = 'result-container';
+  pv.appendChild(rp);
+
+  // Start elapsed timer
+  startElapsedTimer();
+}
+
+let elapsedTimer = null;
+function startElapsedTimer() {
+  if (elapsedTimer) clearInterval(elapsedTimer);
+  const start = Date.now();
+  elapsedTimer = setInterval(() => {
+    const el = document.getElementById('p-elapsed');
+    if (el) el.textContent = ((Date.now() - start) / 1000).toFixed(1) + 's';
+    else clearInterval(elapsedTimer);
+  }, 100);
+}
+
+function renderPlan(plan) {
+  if (!plan) return;
+  state.plan = plan;
+
+  // Update plan output
+  const planOut = document.getElementById('plan-output');
+  if (planOut) {
+    planOut.innerHTML = `
+      <span class="k">totalTasks:</span> <span class="v">${plan.totalTasks}</span>
+      <span class="k">&nbsp;&nbsp;totalWaves:</span> <span class="v">${plan.totalWaves}</span><br>
+      <span class="k">execution:</span> <span class="v">parallel waves with dependency ordering</span><br>
+      <span class="k">status:</span> <span style="color:var(--green)">plan compiled ✓</span>
+    `;
+  }
+
+  // Mark planning done
+  const planNum = document.querySelector('.phase-num.active');
+  if (planNum) { planNum.classList.remove('active'); planNum.classList.add('done'); planNum.textContent = '✓'; }
+  const planLbl = document.querySelector('.phase-label.active');
+  if (planLbl) { planLbl.classList.remove('active'); planLbl.classList.add('done'); }
+
+  // Stats
+  const ptasks = document.getElementById('p-tasks');
+  const pwaves = document.getElementById('p-waves');
+  if (ptasks) ptasks.textContent = plan.totalTasks;
+  if (pwaves) pwaves.textContent = plan.totalWaves;
+
+  // Render waves
+  const wc = document.getElementById('waves-container');
+  if (!wc) return;
+  wc.innerHTML = '';
+
+  (plan.waves || []).forEach(wave => {
+    const wg = document.createElement('div');
+    wg.className = 'wave-group fade-in';
+    wg.id = `wave-group-${wave.wave}`;
+
+    const tasks = wave.tasks || [];
+    const cols = Math.min(tasks.length, 3);
+
+    wg.innerHTML = `
+      <div class="wave-label"><span class="wnum">WAVE ${wave.wave}</span> — ${tasks.length} task${tasks.length!==1?'s':''} running in parallel</div>
+      <div class="wave-tasks" style="grid-template-columns: repeat(${cols}, 1fr)">
+        ${tasks.map(taskId => renderTaskCard(taskId)).join('')}
+      </div>
+    `;
+    wc.appendChild(wg);
+    state.tasks[taskId] = state.tasks[taskId] || {};
+
+    // Initialize tasks state
+    tasks.forEach(tid => { state.tasks[tid] = state.tasks[tid] || { status: 'pending' }; });
+  });
+}
+
+function renderTaskCard(taskId) {
+  return `
+    <div class="task-card pending" id="tc-${taskId}">
+      <div class="task-top">
+        <div class="task-id">${taskId}</div>
+        <div class="task-agent-badge" id="tb-${taskId}" style="display:none"></div>
+        <div class="task-status-icon" id="ti-${taskId}">○</div>
+      </div>
+      <div class="task-title" id="tt-${taskId}">Queued</div>
+      <div class="task-progress-track"><div class="task-progress-fill" id="tp-${taskId}"></div></div>
+      <div class="task-metrics" id="tm-${taskId}"></div>
+      <div class="task-output" id="to-${taskId}"><div class="task-output-text" id="tot-${taskId}"></div></div>
+    </div>
+  `;
+}
+
+function setTaskState(taskId, status, data = {}) {
+  const card = document.getElementById(`tc-${taskId}`);
+  if (!card) return;
+
+  // Merge data
+  state.tasks[taskId] = { ...state.tasks[taskId], status, ...data };
+
+  // Remove old state classes
+  card.classList.remove('pending', 'running', 'done', 'failed');
+  card.classList.add(status);
+
+  const icon = document.getElementById(`ti-${taskId}`);
+  const title = document.getElementById(`tt-${taskId}`);
+  const progress = document.getElementById(`tp-${taskId}`);
+  const metrics = document.getElementById(`tm-${taskId}`);
+  const badge = document.getElementById(`tb-${taskId}`);
+
+  if (status === 'running') {
+    icon.textContent = '◌';
+    icon.style.color = 'var(--teal)';
+    title.textContent = `Running → ${data.agent || '…'}`;
+    title.style.color = 'var(--teal)';
+    progress.style.width = '60%';
+    progress.classList.add('running');
+
+    // Badge
+    if (data.agent && badge) {
+      const agentClass = getAgentClass(data.agent);
+      badge.className = `task-agent-badge ${agentClass}`;
+      badge.style.display = 'flex';
+      badge.innerHTML = `<span>⬡</span>${data.agent}`;
+    }
+  } else if (status === 'done') {
+    icon.textContent = '✓';
+    icon.style.color = 'var(--green)';
+    title.textContent = `Completed`;
+    title.style.color = 'var(--text)';
+    progress.style.width = '100%';
+    progress.classList.remove('running');
+    progress.style.background = 'var(--green)';
+    progress.style.transition = 'width 0.3s ease';
+
+    // Metrics
+    if (metrics) {
+      metrics.innerHTML = `
+        <div class="task-metric"><span class="lbl">tokens:</span><span class="val tokens">${data.tokens ?? '—'}</span></div>
+        <div class="task-metric"><span class="lbl">time:</span><span class="val time">${data.timeMs ? data.timeMs + 'ms' : '—'}</span></div>
+        <div class="task-metric"><span class="lbl">status:</span><span class="val ok">success</span></div>
+      `;
+    }
+
+    // Output
+    if (data.output) {
+      const out = document.getElementById(`to-${taskId}`);
+      const outTxt = document.getElementById(`tot-${taskId}`);
+      if (out && outTxt) {
+        outTxt.textContent = data.output;
+        out.classList.add('show');
+      }
+    }
+  } else if (status === 'failed') {
+    icon.textContent = '✗';
+    icon.style.color = 'var(--red)';
+    title.textContent = 'Failed';
+    title.style.color = 'var(--red)';
+    progress.classList.remove('running');
+    progress.style.background = 'var(--red)';
+    progress.style.width = '100%';
+
+    if (data.error) {
+      const out = document.getElementById(`to-${taskId}`);
+      if (out) {
+        out.style.borderLeftColor = 'var(--red)';
+        out.classList.add('show');
+        const t = document.getElementById(`tot-${taskId}`);
+        if (t) { t.textContent = data.error; t.style.color = '#fca5a5'; }
+      }
+    }
+  }
+}
+
+function highlightWave(waveNum) {
+  const wg = document.getElementById(`wave-group-${waveNum}`);
+  if (wg) {
+    wg.style.opacity = '0.5';
+    setTimeout(() => { wg.style.opacity = '1'; wg.style.transition = 'opacity 0.5s'; }, 50);
+  }
+}
+
+function showMergePhase() {
+  const mc = document.getElementById('merge-container');
+  if (!mc) return;
+  mc.innerHTML = `
+    <div class="merge-phase fade-in">
+      <div class="merge-anim">
+        <div class="merge-ring"></div>
+        <div class="merge-ring-2"></div>
+        <div class="merge-center">✦</div>
+      </div>
+      <div class="merge-info">
+        <div class="merge-title">Merger Agent Synthesizing</div>
+        <div class="merge-sub">Aggregating all task outputs into final executive summary…</div>
+      </div>
+      <div class="merge-dots">
+        <div class="merge-dot"></div>
+        <div class="merge-dot"></div>
+        <div class="merge-dot"></div>
+      </div>
+    </div>
+  `;
+}
+
+async function fetchResult(wfId) {
+  if (elapsedTimer) clearInterval(elapsedTimer);
+  try {
+    const r = await fetch(`${API}/api/workflows/${wfId}/result`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    renderResult(data);
+    toast('Workflow complete!', 'success');
+  } catch(e) {
+    addEvent('error', `Failed to fetch result: ${e.message}`);
+    toast('Could not fetch final result', 'error');
+  }
+}
+
+function renderResult(data) {
+  // Hide merge
+  const mc = document.getElementById('merge-container');
+  if (mc) mc.innerHTML = '';
+
+  const rc = document.getElementById('result-container');
+  if (!rc) return;
+
+  // Build task output rows
+  const taskOutputs = data.task_outputs || {};
+  const taskRows = Object.entries(taskOutputs).map(([tid, out]) =>
+    `<div style="margin-bottom:16px"><div style="font-size:10px;color:var(--teal);margin-bottom:6px">${escHtml(tid)}</div><div class="result-text">${escHtml(out)}</div></div>`
+  ).join('') || '<div style="color:var(--muted);font-size:12px">No task outputs available</div>';
+
+  rc.innerHTML = `
+    <div class="result-section fade-in">
+      <div class="result-hdr">
+        <div class="result-hdr-icon">✦</div>
+        <div class="result-hdr-title">Workflow Complete — Final Result</div>
+        <div style="margin-left:auto;font-size:10px;color:var(--green);display:flex;align-items:center;gap:6px"><div style="width:6px;height:6px;background:var(--green);border-radius:50%"></div> DONE</div>
+      </div>
+      <div class="result-tabs">
+        <div class="result-tab active" onclick="switchTab(this,'rt-sum')">Executive Summary</div>
+        <div class="result-tab" onclick="switchTab(this,'rt-raw')">Task Outputs</div>
+      </div>
+      <div id="rt-sum" class="result-tab-content active">
+        <div class="result-text">${escHtml(data.result || '(no summary available)')}</div>
+      </div>
+      <div id="rt-raw" class="result-tab-content">
+        ${taskRows}
+      </div>
+      <div class="result-actions">
+        <button class="btn-result-action primary" onclick="copyResult()">⧉ Copy Summary</button>
+        <button class="btn-result-action" onclick="downloadJSON()">⬇ Export JSON</button>
+        <button class="btn-result-action" onclick="startWorkflow()">↺ New Workflow</button>
+      </div>
+    </div>
+  `;
+
+  // Store for export
+  window._lastResult = data;
+}
+
+function copyResult() {
+  if (!window._lastResult) return;
+  navigator.clipboard.writeText(window._lastResult.result || '');
+  toast('Summary copied to clipboard', 'success');
+}
+
+function downloadJSON() {
+  if (!window._lastResult) return;
+  const blob = new Blob([JSON.stringify(window._lastResult, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = `neuralflow-${state.currentWfId}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ═══════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════ */
+function getAgentClass(agent) {
+  const a = (agent || '').toLowerCase();
+  if (a.includes('research')) return 'research';
+  if (a.includes('code') || a.includes('coder')) return 'code';
+  if (a.includes('writer') || a.includes('write')) return 'writer';
+  if (a.includes('analyst') || a.includes('analys')) return 'analyst';
+  return 'planner';
+}
+
+function addEvent(type, msg) {
+  const container = document.getElementById('event-stream');
+  const now = new Date().toISOString().split('T')[1].slice(0, 12);
+
+  const typeMap = {
+    workflow: 'workflow', task: 'task', wave: 'wave',
+    system: 'system', error: 'error', success: 'success'
+  };
+  const cls = typeMap[type] || 'system';
+
+  const line = document.createElement('div');
+  line.className = 'event-line';
+  line.innerHTML = `
+    <div class="e-time">${now}</div>
+    <div class="e-type ${cls}">${type.toUpperCase()}</div>
+    <div class="e-msg">${msg}</div>
+  `;
+  container.appendChild(line);
+  container.scrollTop = container.scrollHeight;
+}
+
+function clearEventStream() {
+  document.getElementById('event-stream').innerHTML = '';
+  state.eventCount = 0;
+  document.getElementById('event-counter').textContent = '0 events';
+}
+
+function setGlobalStatus(state, txt) {
+  const badge = document.getElementById('global-status-badge');
+  const label = document.getElementById('global-status-txt');
+  badge.className = `status-badge ${state}`;
+  label.textContent = txt;
+}
+
+function setBtnState(st) {
+  const btn = document.getElementById('btn-execute');
+  const txt = document.getElementById('btn-text');
+  if (st === 'running') {
+    btn.disabled = true;
+    txt.innerHTML = `<div style="width:14px;height:14px;border:2px solid rgba(0,0,0,0.3);border-top-color:#000;border-radius:50%;animation:spin 0.8s linear infinite"></div> EXECUTING…`;
+  } else {
+    btn.disabled = false;
+    txt.textContent = '⬡ EXECUTE WORKFLOW';
+  }
+}
+
+function switchTab(el, contentId) {
+  el.closest('.result-section, .phase-card').querySelectorAll('.result-tab').forEach(t => t.classList.remove('active'));
+  el.closest('.result-section, .phase-card').querySelectorAll('.result-tab-content').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById(contentId)?.classList.add('active');
+}
+
+function updateMetricsPost(dur) {
+  state.sessionWfCount++;
+  document.getElementById('rm-wf').textContent = state.sessionWfCount;
+  const avgDur = state.durations.reduce((a,b)=>a+b,0)/state.durations.length;
+  document.getElementById('rm-dur').innerHTML = `${(avgDur/1000).toFixed(1)}<span class="unit">s</span>`;
+  const total = state.successes + state.failures;
+  const sr = total > 0 ? ((state.successes/total)*100).toFixed(0) : '—';
+  document.getElementById('rm-sr').innerHTML = `${sr}<span class="unit">%</span>`;
+}
+
+function toast(msg, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ'}</span> ${escHtml(msg)}`;
+  container.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 3500);
+}
+
+function escHtml(str) {
+  if (typeof str !== 'string') return String(str ?? '');
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ═══════════════════════════════════════════
+   KEYBOARD SHORTCUT
+═══════════════════════════════════════════ */
+document.addEventListener('keydown', (e) => {
+  const inp = document.getElementById('prompt-input');
+  if (e.target === inp && e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault();
+    startWorkflow();
+  }
+});
+
+/* ═══════════════════════════════════════════
+   METRICS FLUCTUATION
+═══════════════════════════════════════════ */
+setInterval(() => {
+  const cpuEl = document.getElementById('met-cpu');
+  const memEl = document.getElementById('met-mem');
+  const latEl = document.getElementById('met-lat');
+  if (!cpuEl) return;
+  cpuEl.textContent = (30 + Math.floor(Math.random() * 20)) + '%';
+  memEl.textContent = (2.0 + Math.random() * 0.4).toFixed(1) + 'GB';
+  latEl.textContent = (10 + Math.floor(Math.random() * 15)) + 'ms';
+}, 2500);
+
+/* ═══════════════════════════════════════════
+   BACKGROUND PARTICLE CANVAS
+═══════════════════════════════════════════ */
+(function initParticles() {
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.4';
+  document.body.insertBefore(canvas, document.body.firstChild);
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [];
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  for (let i = 0; i < 80; i++) {
+    particles.push({ x: Math.random()*W, y: Math.random()*H, vx:(Math.random()-0.5)*0.3, vy:(Math.random()-0.5)*0.3, r: Math.random()*1.5+0.3, a: Math.random() });
+  }
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    particles.forEach((p,i) => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(0,232,198,${p.a * 0.3})`;
+      ctx.fill();
+      // Connect nearby
+      particles.forEach((p2, j) => {
+        if (j <= i) return;
+        const d = Math.hypot(p.x-p2.x, p.y-p2.y);
+        if (d < 100) {
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y); ctx.lineTo(p2.x, p2.y);
+          ctx.strokeStyle = `rgba(0,232,198,${0.06*(1-d/100)})`;
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      });
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+</script>
+</body>
+</html>
